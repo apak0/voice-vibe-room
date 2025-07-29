@@ -26,8 +26,7 @@ export default {
 				foreground: 'hsl(var(--foreground))',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
-					foreground: 'hsl(var(--primary-foreground))',
-					glow: 'hsl(var(--primary-glow))'
+					foreground: 'hsl(var(--primary-foreground))'
 				},
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
@@ -62,19 +61,7 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
-				},
-				'voice-active': 'hsl(var(--voice-active))',
-				'voice-inactive': 'hsl(var(--voice-inactive))',
-				'voice-speaking': 'hsl(var(--voice-speaking))'
-			},
-			backgroundImage: {
-				'gradient-primary': 'var(--gradient-primary)',
-				'gradient-glass': 'var(--gradient-glass)',
-				'gradient-voice': 'var(--gradient-voice)'
-			},
-			boxShadow: {
-				'glow-primary': 'var(--glow-primary)',
-				'glow-accent': 'var(--glow-accent)'
+				}
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -101,17 +88,8 @@ export default {
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out',
-				'pulse-glow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-				'voice-pulse': 'voice-pulse 1.5s ease-in-out infinite'
+				'accordion-up': 'accordion-up 0.2s ease-out'
 			}
-		},
-		keyframes: {
-			'voice-pulse': {
-				'0%, 100%': { transform: 'scale(1)', opacity: '1' },
-				'50%': { transform: 'scale(1.05)', opacity: '0.8' }
-			}
-		}
 		}
 	},
 	plugins: [require("tailwindcss-animate")],

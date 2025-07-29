@@ -68,7 +68,7 @@ export const RoomManager: React.FC<RoomManagerProps> = ({ onJoinRoom }) => {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-primary rounded-full mb-4 shadow-glow-primary">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
             <Mic className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Voice Chat</h1>
@@ -76,7 +76,7 @@ export const RoomManager: React.FC<RoomManagerProps> = ({ onJoinRoom }) => {
         </div>
 
         {/* User Name Input */}
-        <Card className="bg-gradient-glass backdrop-blur-md border-white/20 p-6 mb-6">
+        <Card className="p-6 mb-6">
           <div className="space-y-4">
             <div>
               <Label htmlFor="userName" className="text-foreground">Your Name</Label>
@@ -86,7 +86,7 @@ export const RoomManager: React.FC<RoomManagerProps> = ({ onJoinRoom }) => {
                 placeholder="Enter your name"
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
-                className="mt-2 bg-background/50 border-white/20"
+                className="mt-2"
                 maxLength={20}
               />
             </div>
@@ -94,7 +94,7 @@ export const RoomManager: React.FC<RoomManagerProps> = ({ onJoinRoom }) => {
         </Card>
 
         {/* Create Room */}
-        <Card className="bg-gradient-glass backdrop-blur-md border-white/20 p-6 mb-4">
+        <Card className="p-6 mb-4">
           <div className="text-center space-y-4">
             <div className="flex items-center justify-center gap-2 text-foreground">
               <Plus className="w-5 h-5" />
@@ -104,8 +104,8 @@ export const RoomManager: React.FC<RoomManagerProps> = ({ onJoinRoom }) => {
               Start a new voice chat room and invite friends
             </p>
             <Button 
-              variant="voice" 
-              size="lg" 
+              variant="default" 
+              size="lg"
               onClick={createRoom}
               disabled={isCreating}
               className="w-full"
@@ -126,7 +126,7 @@ export const RoomManager: React.FC<RoomManagerProps> = ({ onJoinRoom }) => {
         </Card>
 
         {/* Join Room */}
-        <Card className="bg-gradient-glass backdrop-blur-md border-white/20 p-6">
+        <Card className="p-6">
           <div className="space-y-4">
             <div className="flex items-center justify-center gap-2 text-foreground">
               <LogIn className="w-5 h-5" />
@@ -140,13 +140,13 @@ export const RoomManager: React.FC<RoomManagerProps> = ({ onJoinRoom }) => {
                 placeholder="Enter room ID"
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                className="mt-2 bg-background/50 border-white/20"
+                className="mt-2"
                 maxLength={10}
               />
             </div>
             <Button 
-              variant="glass" 
-              size="lg" 
+              variant="outline" 
+              size="lg"
               onClick={joinRoom}
               className="w-full"
             >

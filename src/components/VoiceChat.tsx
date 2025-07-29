@@ -170,7 +170,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <Card className="bg-gradient-glass backdrop-blur-md border-white/20 p-6 mb-6">
+        <Card className="p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground mb-2">Voice Chat Room</h1>
@@ -193,21 +193,21 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           {participants.map(participant => (
             <Card 
               key={participant.id} 
-              className={`bg-gradient-glass backdrop-blur-md border-white/20 p-4 transition-all duration-300 ${
-                participant.isSpeaking ? 'animate-voice-pulse border-voice-speaking shadow-glow-accent' : ''
+              className={`p-4 transition-all duration-300 ${
+                participant.isSpeaking ? 'animate-pulse border-primary' : ''
               }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
-                    participant.isSpeaking ? 'bg-voice-speaking' : 'bg-muted'
+                    participant.isSpeaking ? 'bg-primary' : 'bg-muted'
                   }`}>
                     {participant.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <p className="font-medium text-foreground">{participant.name}</p>
                     <p className={`text-xs ${
-                      participant.isSpeaking ? 'text-voice-speaking' : 'text-muted-foreground'
+                      participant.isSpeaking ? 'text-primary' : 'text-muted-foreground'
                     }`}>
                       {participant.isSpeaking ? 'Speaking' : 'Quiet'}
                     </p>
@@ -222,13 +222,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         </div>
 
         {/* Voice Activity Indicator */}
-        <Card className="bg-gradient-glass backdrop-blur-md border-white/20 p-6 mb-6">
+        <Card className="p-6 mb-6">
           <div className="text-center">
             <h3 className="text-lg font-semibold mb-4 text-foreground">Your Voice Activity</h3>
             <div className="flex items-center justify-center gap-4 mb-4">
               <div className="w-64 h-2 bg-muted rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-voice transition-all duration-150"
+                  className="h-full bg-primary transition-all duration-150"
                   style={{ width: `${volumeLevel}%` }}
                 />
               </div>
@@ -243,10 +243,10 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         </Card>
 
         {/* Controls */}
-        <Card className="bg-gradient-glass backdrop-blur-md border-white/20 p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-center gap-4">
             <Button
-              variant={isMuted ? "destructive" : "glass"}
+              variant={isMuted ? "destructive" : "outline"}
               size="lg"
               onClick={toggleMute}
               className="w-16 h-16 rounded-full"
@@ -255,7 +255,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
             </Button>
             
             <Button
-              variant={isDeafened ? "destructive" : "glass"}
+              variant={isDeafened ? "destructive" : "outline"}
               size="lg"
               onClick={toggleDeafen}
               className="w-16 h-16 rounded-full"

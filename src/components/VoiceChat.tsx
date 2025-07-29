@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Mic, MicOff, Phone, PhoneOff, Users, Volume2, VolumeX } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
+import { useWebRTC } from '@/hooks/useWebRTC';
 
 interface Participant {
   id: string;
@@ -25,11 +26,15 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const [isDeafened, setIsDeafened] = useState(false);
   const [volumeLevel, setVolumeLevel] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [userId] = useState(() => uuidv4());
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const microphoneRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Initialize WebRTC connections
+  const { peersCount } = useWebRTC(roomId, userId, streamRef.current);
 
   useEffect(() => {
     initializeAudio();
@@ -37,7 +42,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     // Add current user to participants
     setParticipants([
       {
-        id: uuidv4(),
+        id: userId,
         name: userName,
         isSpeaking: false,
         isMuted: false
@@ -183,7 +188,12 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Users className="w-5 h-5" />
-              <span>{participants.length} participant{participants.length !== 1 ? 's' : ''}</span>
+              <span>{participants.length + peersCount} participant{(participants.length + peersCount) !== 1 ? 's' : ''}</span>
+              {peersCount > 0 && (
+                <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full">
+                  {peersCount} connected
+                </span>
+              )}
             </div>
           </div>
         </Card>
@@ -279,7 +289,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
               {isDeafened ? ' • Audio deafened' : ' • Audio enabled'}
             </p>
             <p className="text-xs text-muted-foreground">
-              Status: {isConnected ? 'Connected' : 'Connecting...'}
+              Status: {isConnected ? 'Connected' : 'Connecting...'} • WebRTC: {peersCount > 0 ? `${peersCount} peers` : 'No peers'}
             </p>
           </div>
         </Card>

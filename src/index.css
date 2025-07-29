@@ -2,58 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Voice Chat App Design System - Modern gradients and glassmorphism */
-
 @layer base {
   :root {
-    /* Dark theme optimized for voice chat */
     --background: 220 15% 8%;
     --foreground: 210 40% 98%;
-
     --card: 220 13% 11%;
     --card-foreground: 210 40% 98%;
-
     --popover: 220 13% 11%;
     --popover-foreground: 210 40% 98%;
-
-    /* Beautiful purple-blue gradient theme */
     --primary: 260 85% 65%;
     --primary-foreground: 210 40% 98%;
-    --primary-glow: 270 90% 75%;
-
     --secondary: 220 13% 15%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 220 13% 15%;
     --muted-foreground: 215 20.2% 65.1%;
-
     --accent: 280 80% 70%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 62.8% 60%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 220 13% 18%;
     --input: 220 13% 15%;
     --ring: 260 85% 65%;
-
     --radius: 0.75rem;
-
-    /* Modern gradients for voice chat UI */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-glass: linear-gradient(135deg, hsl(var(--card) / 0.8), hsl(var(--card) / 0.4));
-    --gradient-voice: linear-gradient(90deg, hsl(var(--accent)), hsl(var(--primary)));
-    
-    /* Glow effects */
-    --glow-primary: 0 0 40px hsl(var(--primary) / 0.3);
-    --glow-accent: 0 0 20px hsl(var(--accent) / 0.4);
-    
-    /* Voice activity colors */
-    --voice-active: 120 100% 50%;
-    --voice-inactive: 0 0% 50%;
-    --voice-speaking: 260 85% 65%;
-
-    /* Sidebar colors */
     --sidebar-background: 220 13% 11%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 260 85% 65%;
@@ -67,32 +37,23 @@
   .dark {
     --background: 220 15% 8%;
     --foreground: 210 40% 98%;
-
     --card: 220 13% 11%;
     --card-foreground: 210 40% 98%;
-
     --popover: 220 13% 11%;
     --popover-foreground: 210 40% 98%;
-
     --primary: 260 85% 65%;
     --primary-foreground: 210 40% 98%;
-
     --secondary: 220 13% 15%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 220 13% 15%;
     --muted-foreground: 215 20.2% 65.1%;
-
     --accent: 280 80% 70%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 62.8% 60%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 220 13% 18%;
     --input: 220 13% 15%;
     --ring: 260 85% 65%;
-    
     --sidebar-background: 220 13% 11%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 260 85% 65%;
@@ -108,7 +69,6 @@
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
   }

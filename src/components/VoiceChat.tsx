@@ -71,14 +71,19 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           }
           return prev;
         });
+        
+        console.log(`User joined: ${data.userName} (${data.userId})`);
       }
     };
 
     const handleUserLeft = (leftUserId: string) => {
       setParticipants(prev => prev.filter(p => p.id !== leftUserId));
+      console.log(`User left: ${leftUserId}`);
     };
 
     const handleRoomParticipants = (roomParticipants: { userId: string; userName: string }[]) => {
+      console.log('Room participants received:', roomParticipants);
+      
       const otherParticipants = roomParticipants
         .filter(p => p.userId !== userId)
         .map(p => ({
@@ -90,7 +95,9 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       
       setParticipants(prev => {
         const currentUser = prev.find(p => p.id === userId);
-        return currentUser ? [currentUser, ...otherParticipants] : otherParticipants;
+        const newList = currentUser ? [currentUser, ...otherParticipants] : otherParticipants;
+        console.log('Updated participants:', newList);
+        return newList;
       });
     };
 
@@ -105,7 +112,21 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     socketService.onRoomParticipants(handleRoomParticipants);
     socketService.onUserMuteStatus(handleUserMuteStatus);
 
+    // Poll for participants periodically when using local fallback
+    const pollInterval = setInterval(() => {
+      const participantsKey = `room_${roomId}_participants`;
+      const storedParticipants = JSON.parse(localStorage.getItem(participantsKey) || '[]');
+      
+      // Clean up old participants (older than 30 seconds)
+      const now = Date.now();
+      const activeParticipants = storedParticipants.filter((p: any) => now - p.timestamp < 30000);
+      localStorage.setItem(participantsKey, JSON.stringify(activeParticipants));
+      
+      handleRoomParticipants(activeParticipants);
+    }, 3000);
+
     return () => {
+      clearInterval(pollInterval);
       cleanup();
     };
   }, [userId, userName, roomId]);
@@ -252,6 +273,26 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                   {peersCount} connected
                 </span>
               )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Debug Info */}
+        <Card className="p-4 mb-6 bg-muted/50">
+          <div className="text-sm text-muted-foreground">
+            <p><strong>Debug Info:</strong></p>
+            <p>Room ID: {roomId}</p>
+            <p>Your User ID: {userId}</p>
+            <p>Your Name: {userName}</p>
+            <p>Participants in state: {participants.length}</p>
+            <p>WebRTC peers: {peersCount}</p>
+            <div className="mt-2">
+              <p><strong>Participants:</strong></p>
+              {participants.map(p => (
+                <div key={p.id} className="ml-2">
+                  • {p.name} ({p.id.substring(0, 8)}...) {p.isMuted ? '🔇' : '🎤'} {p.isSpeaking ? '🗣️' : ''}
+                </div>
+              ))}
             </div>
           </div>
         </Card>

@@ -6,7 +6,7 @@ interface PeerConnection {
   userId: string;
 }
 
-export const useWebRTC = (roomId: string, userId: string, localStream: MediaStream | null) => {
+export const useWebRTC = (roomId: string, userId: string, userName: string, localStream: MediaStream | null) => {
   const peersRef = useRef<Map<string, PeerConnection>>(new Map());
   const socketRef = useRef(socketService.connect());
 
@@ -118,9 +118,9 @@ export const useWebRTC = (roomId: string, userId: string, localStream: MediaStre
     }
   }, [roomId, createPeerConnection]);
 
-  const addUser = useCallback((newUserId: string) => {
-    if (newUserId !== userId) {
-      createOffer(newUserId);
+  const addUser = useCallback((data: { userId: string; userName: string }) => {
+    if (data.userId !== userId) {
+      createOffer(data.userId);
     }
   }, [userId, createOffer]);
 
@@ -142,7 +142,7 @@ export const useWebRTC = (roomId: string, userId: string, localStream: MediaStre
     const socket = socketRef.current;
 
     // Join room
-    socketService.joinRoom(roomId, userId);
+    socketService.joinRoom(roomId, userId, userName);
 
     // Set up event listeners
     socketService.onUserJoined(addUser);

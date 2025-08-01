@@ -37,9 +37,9 @@ class SocketService {
     return this.socket;
   }
 
-  joinRoom(roomId: string, userId: string) {
+  joinRoom(roomId: string, userId: string, userName: string) {
     if (this.socket) {
-      this.socket.emit('join-room', { roomId, userId });
+      this.socket.emit('join-room', { roomId, userId, userName });
     }
   }
 
@@ -55,7 +55,7 @@ class SocketService {
     }
   }
 
-  onUserJoined(callback: (userId: string) => void) {
+  onUserJoined(callback: (data: { userId: string; userName: string }) => void) {
     if (this.socket) {
       this.socket.on('user-joined', callback);
     }
@@ -70,6 +70,24 @@ class SocketService {
   onSignal(callback: (data: { signal: any; fromUserId: string }) => void) {
     if (this.socket) {
       this.socket.on('signal', callback);
+    }
+  }
+
+  onRoomParticipants(callback: (participants: { userId: string; userName: string }[]) => void) {
+    if (this.socket) {
+      this.socket.on('room-participants', callback);
+    }
+  }
+
+  onUserMuteStatus(callback: (data: { userId: string; isMuted: boolean }) => void) {
+    if (this.socket) {
+      this.socket.on('user-mute-status', callback);
+    }
+  }
+
+  sendMuteStatus(roomId: string, isMuted: boolean) {
+    if (this.socket) {
+      this.socket.emit('mute-status', { roomId, isMuted });
     }
   }
 

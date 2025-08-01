@@ -6,6 +6,7 @@ import { Mic, MicOff, Phone, PhoneOff, Users, Volume2, VolumeX } from 'lucide-re
 import { toast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { useWebRTC } from '@/hooks/useWebRTC';
+import { socketService } from '@/services/socketService';
 
 interface Participant {
   id: string;
@@ -34,7 +35,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const streamRef = useRef<MediaStream | null>(null);
 
   // Initialize WebRTC connections
-  const { peersCount } = useWebRTC(roomId, userId, streamRef.current);
+  const { peersCount } = useWebRTC(roomId, userId, userName, streamRef.current);
 
   useEffect(() => {
     initializeAudio();
@@ -55,10 +56,59 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       description: `Joined room: ${roomId}`,
     });
 
+    // Socket event listeners for participants
+    const handleUserJoined = (data: { userId: string; userName: string }) => {
+      if (data.userId !== userId) {
+        setParticipants(prev => {
+          const exists = prev.find(p => p.id === data.userId);
+          if (!exists) {
+            return [...prev, {
+              id: data.userId,
+              name: data.userName,
+              isSpeaking: false,
+              isMuted: false
+            }];
+          }
+          return prev;
+        });
+      }
+    };
+
+    const handleUserLeft = (leftUserId: string) => {
+      setParticipants(prev => prev.filter(p => p.id !== leftUserId));
+    };
+
+    const handleRoomParticipants = (roomParticipants: { userId: string; userName: string }[]) => {
+      const otherParticipants = roomParticipants
+        .filter(p => p.userId !== userId)
+        .map(p => ({
+          id: p.userId,
+          name: p.userName,
+          isSpeaking: false,
+          isMuted: false
+        }));
+      
+      setParticipants(prev => {
+        const currentUser = prev.find(p => p.id === userId);
+        return currentUser ? [currentUser, ...otherParticipants] : otherParticipants;
+      });
+    };
+
+    const handleUserMuteStatus = (data: { userId: string; isMuted: boolean }) => {
+      setParticipants(prev => prev.map(p => 
+        p.id === data.userId ? { ...p, isMuted: data.isMuted } : p
+      ));
+    };
+
+    socketService.onUserJoined(handleUserJoined);
+    socketService.onUserLeft(handleUserLeft);
+    socketService.onRoomParticipants(handleRoomParticipants);
+    socketService.onUserMuteStatus(handleUserMuteStatus);
+
     return () => {
       cleanup();
     };
-  }, []);
+  }, [userId, userName, roomId]);
 
   const initializeAudio = async () => {
     try {
@@ -131,6 +181,14 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         track.enabled = isMuted;
       });
       setIsMuted(!isMuted);
+      
+      // Update local participant state
+      setParticipants(prev => prev.map(p => 
+        p.id === userId ? { ...p, isMuted: !isMuted } : p
+      ));
+      
+      // Send mute status to other users
+      socketService.sendMuteStatus(roomId, !isMuted);
       
       toast({
         title: !isMuted ? "Microphone muted" : "Microphone unmuted",

@@ -37,6 +37,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   // Initialize WebRTC connections
   const { peersCount } = useWebRTC(roomId, userId, userName, streamRef.current);
 
+  const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+
   useEffect(() => {
     console.log(`Initializing VoiceChat for user: ${userName} (${userId}) in room: ${roomId}`);
     
@@ -86,6 +88,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         console.log(`Removed user from participants:`, newList);
         return newList;
       });
+      
+      // Clean up audio element for left user
+      const audioElement = audioElementsRef.current.get(leftUserId);
+      if (audioElement) {
+        audioElement.remove();
+        audioElementsRef.current.delete(leftUserId);
+      }
     };
 
     const handleRoomParticipants = (roomParticipants: { userId: string; userName: string }[]) => {
@@ -154,19 +163,42 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       channel.channel
         .on('presence', { event: 'sync' }, () => {
           const newState = channel.channel.presenceState();
-          const participants = Object.values(newState).flat().map((presence: any) => ({
+          const currentParticipants = Object.values(newState).flat().map((presence: any) => ({
             id: presence.userId,
             name: presence.userName,
             isSpeaking: false,
             isMuted: presence.isMuted || false
           }));
-          setParticipants(participants);
+          
+          // Always include current user if not in the list
+          const hasCurrentUser = currentParticipants.some(p => p.id === userId);
+          if (!hasCurrentUser) {
+            currentParticipants.unshift({
+              id: userId,
+              name: userName,
+              isSpeaking: false,
+              isMuted: false
+            });
+          }
+          
+          setParticipants(currentParticipants);
         })
         .on('presence', { event: 'join' }, ({ key, newPresences }) => {
           console.log('User joined:', key, newPresences);
         })
         .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
           console.log('User left:', key, leftPresences);
+          // Remove left users from participants
+          leftPresences.forEach((presence: any) => {
+            setParticipants(prev => prev.filter(p => p.id !== presence.userId));
+            
+            // Clean up audio elements
+            const audioElement = audioElementsRef.current.get(presence.userId);
+            if (audioElement) {
+              audioElement.remove();
+              audioElementsRef.current.delete(presence.userId);
+            }
+          });
         });
     }
 

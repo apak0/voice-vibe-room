@@ -51,6 +51,8 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
   }, [roomId, localStream]);
 
   const playRemoteAudio = useCallback((stream: MediaStream, userId: string) => {
+    console.log(`Playing remote audio for user: ${userId}`);
+    
     // Create or update audio element for this user
     let audioElement = document.getElementById(`audio-${userId}`) as HTMLAudioElement;
     
@@ -58,12 +60,17 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
       audioElement = document.createElement('audio');
       audioElement.id = `audio-${userId}`;
       audioElement.autoplay = true;
+      audioElement.controls = false;
       audioElement.style.display = 'none';
+      audioElement.volume = 1.0;
       document.body.appendChild(audioElement);
+      console.log(`Created audio element for user: ${userId}`);
     }
 
     audioElement.srcObject = stream;
-    audioElement.play().catch(console.error);
+    audioElement.play()
+      .then(() => console.log(`Successfully playing audio for user: ${userId}`))
+      .catch(error => console.error(`Error playing audio for user ${userId}:`, error));
   }, []);
 
   const createOffer = useCallback(async (remoteUserId: string) => {

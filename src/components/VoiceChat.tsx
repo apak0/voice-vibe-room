@@ -158,49 +158,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     updateHeartbeat(); // Initial call
 
     // Set up presence tracking for Supabase realtime
-    const channel = socketService.connect();
-    if (channel?.channel) {
-      channel.channel
-        .on('presence', { event: 'sync' }, () => {
-          const newState = channel.channel.presenceState();
-          const currentParticipants = Object.values(newState).flat().map((presence: any) => ({
-            id: presence.userId,
-            name: presence.userName,
-            isSpeaking: false,
-            isMuted: presence.isMuted || false
-          }));
-          
-          // Always include current user if not in the list
-          const hasCurrentUser = currentParticipants.some(p => p.id === userId);
-          if (!hasCurrentUser) {
-            currentParticipants.unshift({
-              id: userId,
-              name: userName,
-              isSpeaking: false,
-              isMuted: false
-            });
-          }
-          
-          setParticipants(currentParticipants);
-        })
-        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-          console.log('User joined:', key, newPresences);
-        })
-        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-          console.log('User left:', key, leftPresences);
-          // Remove left users from participants
-          leftPresences.forEach((presence: any) => {
-            setParticipants(prev => prev.filter(p => p.id !== presence.userId));
-            
-            // Clean up audio elements
-            const audioElement = audioElementsRef.current.get(presence.userId);
-            if (audioElement) {
-              audioElement.remove();
-              audioElementsRef.current.delete(presence.userId);
-            }
-          });
-        });
-    }
+    socketService.joinRoom(roomId, userId, userName);
 
     return () => {
       clearInterval(heartbeatInterval);

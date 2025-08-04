@@ -31,9 +31,9 @@ class SocketService {
     return SocketService.instance;
   }
 
-  connect(): any {
+  connect() {
     console.log('Using Supabase Realtime for real-time communication');
-    return this;
+    return { channel: this.channel };
   }
 
   private setupChannel(roomId: string) {

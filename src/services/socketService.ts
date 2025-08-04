@@ -33,32 +33,16 @@ class SocketService {
 
   connect(): Socket {
     if (!this.socket) {
-      // Try to connect to real server first
-      this.socket = io('ws://localhost:3001', {
-        transports: ['websocket'],
-        autoConnect: true,
-        timeout: 2000,
-      });
-
-      this.socket.on('connect', () => {
-        console.log('Connected to real signaling server');
-      });
-
-      this.socket.on('disconnect', () => {
-        console.log('Disconnected from signaling server');
-      });
-
-      this.socket.on('connect_error', (error) => {
-        console.warn('Socket connection failed, using local fallback:', error);
-        this.initializeBroadcastChannel();
-      });
-
-      // Set up real server event handlers
-      this.socket.on('user-joined', (data) => this.emit('user-joined', data));
-      this.socket.on('user-left', (data) => this.emit('user-left', data));
-      this.socket.on('signal', (data) => this.emit('signal', data));
-      this.socket.on('room-participants', (data) => this.emit('room-participants', data));
-      this.socket.on('user-mute-status', (data) => this.emit('user-mute-status', data));
+      console.log('No real server available, using local fallback mode');
+      this.initializeBroadcastChannel();
+      
+      // Create a dummy socket object for compatibility
+      this.socket = {
+        connected: false,
+        emit: () => {},
+        on: () => {},
+        disconnect: () => {}
+      } as any;
     }
     
     return this.socket;
@@ -73,9 +57,13 @@ class SocketService {
         
         switch (type) {
           case 'user-joined':
-            this.emit('user-joined', data);
+            console.log('BroadcastChannel: user-joined received', data);
+            if (data.roomId === this.currentRoomId || !data.roomId) {
+              this.emit('user-joined', data);
+            }
             break;
           case 'user-left':
+            console.log('BroadcastChannel: user-left received', data);
             this.emit('user-left', data);
             break;
           case 'signal':
@@ -84,6 +72,7 @@ class SocketService {
             }
             break;
           case 'room-participants':
+            console.log('BroadcastChannel: room-participants received', data);
             if (data.roomId === this.currentRoomId) {
               this.emit('room-participants', data.participants);
             }
@@ -109,50 +98,51 @@ class SocketService {
   }
 
   joinRoom(roomId: string, userId: string, userName: string) {
+    console.log(`Joining room: ${roomId} as ${userName} (${userId})`);
     this.currentRoomId = roomId;
     this.currentUserId = userId;
     this.currentUserName = userName;
 
-    if (this.socket?.connected) {
-      this.socket.emit('join-room', { roomId, userId, userName });
-    } else {
-      // Use local storage for fallback
-      this.initializeBroadcastChannel();
+    // Always use local storage fallback since no server
+    this.initializeBroadcastChannel();
+    
+    // Store participant in localStorage
+    const participantsKey = `room_${roomId}_participants`;
+    const participants = JSON.parse(localStorage.getItem(participantsKey) || '[]') as Participant[];
+    
+    // Remove existing entry for this user
+    const filteredParticipants = participants.filter(p => p.userId !== userId);
+    
+    // Add current user
+    const newParticipant: Participant = {
+      userId,
+      userName,
+      isMuted: false,
+      timestamp: Date.now()
+    };
+    filteredParticipants.push(newParticipant);
+    
+    console.log(`Storing participants:`, filteredParticipants);
+    localStorage.setItem(participantsKey, JSON.stringify(filteredParticipants));
+    
+    // Broadcast to other tabs immediately
+    if (this.broadcastChannel) {
+      this.broadcastChannel.postMessage({
+        type: 'user-joined',
+        data: { userId, userName, roomId }
+      });
       
-      // Store participant in localStorage
-      const participantsKey = `room_${roomId}_participants`;
-      const participants = JSON.parse(localStorage.getItem(participantsKey) || '[]') as Participant[];
-      
-      // Remove existing entry for this user
-      const filteredParticipants = participants.filter(p => p.userId !== userId);
-      
-      // Add current user
-      const newParticipant: Participant = {
-        userId,
-        userName,
-        isMuted: false,
-        timestamp: Date.now()
-      };
-      filteredParticipants.push(newParticipant);
-      
-      localStorage.setItem(participantsKey, JSON.stringify(filteredParticipants));
-      
-      // Broadcast to other tabs
-      if (this.broadcastChannel) {
-        this.broadcastChannel.postMessage({
-          type: 'user-joined',
-          data: { userId, userName }
-        });
-        
-        // Send current participants to this user
-        setTimeout(() => {
-          this.broadcastChannel!.postMessage({
-            type: 'room-participants',
-            data: { roomId, participants: filteredParticipants }
-          });
-        }, 100);
-      }
+      // Send current participants to this user and others
+      this.broadcastChannel.postMessage({
+        type: 'room-participants',
+        data: { roomId, participants: filteredParticipants }
+      });
     }
+    
+    // Emit locally as well for immediate update
+    setTimeout(() => {
+      this.emit('room-participants', filteredParticipants);
+    }, 50);
   }
 
   leaveRoom(roomId: string, userId: string) {

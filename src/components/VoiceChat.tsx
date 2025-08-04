@@ -148,24 +148,29 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     const heartbeatInterval = setInterval(updateHeartbeat, 5000);
     updateHeartbeat(); // Initial call
 
-    // Poll for participants periodically when using local fallback
-    const pollInterval = setInterval(() => {
-      const participantsKey = `room_${roomId}_participants`;
-      const storedParticipants = JSON.parse(localStorage.getItem(participantsKey) || '[]');
-      
-      // Clean up old participants (older than 15 seconds)
-      const now = Date.now();
-      const activeParticipants = storedParticipants.filter((p: any) => now - p.timestamp < 15000);
-      
-      // Update localStorage with cleaned participants
-      localStorage.setItem(participantsKey, JSON.stringify(activeParticipants));
-      
-      // Update participants state
-      handleRoomParticipants(activeParticipants);
-    }, 2000);
+    // Set up presence tracking for Supabase realtime
+    const channel = socketService.connect();
+    if (channel?.channel) {
+      channel.channel
+        .on('presence', { event: 'sync' }, () => {
+          const newState = channel.channel.presenceState();
+          const participants = Object.values(newState).flat().map((presence: any) => ({
+            id: presence.userId,
+            name: presence.userName,
+            isSpeaking: false,
+            isMuted: presence.isMuted || false
+          }));
+          setParticipants(participants);
+        })
+        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+          console.log('User joined:', key, newPresences);
+        })
+        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+          console.log('User left:', key, leftPresences);
+        });
+    }
 
     return () => {
-      clearInterval(pollInterval);
       clearInterval(heartbeatInterval);
       cleanup();
     };

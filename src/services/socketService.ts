@@ -1,4 +1,5 @@
-import { io, Socket } from 'socket.io-client';
+import { supabase } from '@/integrations/supabase/client';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface Participant {
   userId: string;
@@ -16,8 +17,7 @@ interface SignalData {
 }
 
 class SocketService {
-  private socket: Socket | null = null;
-  private broadcastChannel: BroadcastChannel | null = null;
+  private channel: RealtimeChannel | null = null;
   private static instance: SocketService;
   private currentRoomId: string | null = null;
   private currentUserId: string | null = null;
@@ -31,58 +31,39 @@ class SocketService {
     return SocketService.instance;
   }
 
-  connect(): Socket {
-    if (!this.socket) {
-      console.log('No real server available, using local fallback mode');
-      this.initializeBroadcastChannel();
-      
-      // Create a dummy socket object for compatibility
-      this.socket = {
-        connected: false,
-        emit: () => {},
-        on: () => {},
-        disconnect: () => {}
-      } as any;
-    }
-    
-    return this.socket;
+  connect(): any {
+    console.log('Using Supabase Realtime for real-time communication');
+    return this;
   }
 
-  private initializeBroadcastChannel() {
-    if (!this.broadcastChannel) {
-      this.broadcastChannel = new BroadcastChannel('voice-chat-signaling');
-      
-      this.broadcastChannel.onmessage = (event) => {
-        const { type, data } = event.data;
-        
-        switch (type) {
-          case 'user-joined':
-            console.log('BroadcastChannel: user-joined received', data);
-            if (data.roomId === this.currentRoomId || !data.roomId) {
-              this.emit('user-joined', data);
-            }
-            break;
-          case 'user-left':
-            console.log('BroadcastChannel: user-left received', data);
-            this.emit('user-left', data);
-            break;
-          case 'signal':
-            if (data.targetUserId === this.currentUserId) {
-              this.emit('signal', { signal: data.signal, fromUserId: data.fromUserId });
-            }
-            break;
-          case 'room-participants':
-            console.log('BroadcastChannel: room-participants received', data);
-            if (data.roomId === this.currentRoomId) {
-              this.emit('room-participants', data.participants);
-            }
-            break;
-          case 'user-mute-status':
-            this.emit('user-mute-status', data);
-            break;
-        }
-      };
+  private setupChannel(roomId: string) {
+    if (this.channel) {
+      this.channel.unsubscribe();
     }
+
+    this.channel = supabase.channel(`room:${roomId}`)
+      .on('broadcast', { event: 'user-joined' }, (payload) => {
+        console.log('Supabase: user-joined received', payload);
+        this.emit('user-joined', payload.payload);
+      })
+      .on('broadcast', { event: 'user-left' }, (payload) => {
+        console.log('Supabase: user-left received', payload);
+        this.emit('user-left', payload.payload.userId);
+      })
+      .on('broadcast', { event: 'signal' }, (payload) => {
+        const data = payload.payload;
+        if (data.targetUserId === this.currentUserId) {
+          this.emit('signal', { signal: data.signal, fromUserId: data.fromUserId });
+        }
+      })
+      .on('broadcast', { event: 'room-participants' }, (payload) => {
+        console.log('Supabase: room-participants received', payload);
+        this.emit('room-participants', payload.payload.participants);
+      })
+      .on('broadcast', { event: 'user-mute-status' }, (payload) => {
+        this.emit('user-mute-status', payload.payload);
+      })
+      .subscribe();
   }
 
   private emit(eventName: string, data: any) {
@@ -103,111 +84,78 @@ class SocketService {
     this.currentUserId = userId;
     this.currentUserName = userName;
 
-    // Always use local storage fallback since no server
-    this.initializeBroadcastChannel();
+    // Setup Supabase channel for real-time communication
+    this.setupChannel(roomId);
     
-    // Store participant in localStorage
-    const participantsKey = `room_${roomId}_participants`;
-    const participants = JSON.parse(localStorage.getItem(participantsKey) || '[]') as Participant[];
+    // Broadcast user joined
+    if (this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'user-joined',
+        payload: { userId, userName, roomId }
+      });
+    }
     
-    // Remove existing entry for this user
-    const filteredParticipants = participants.filter(p => p.userId !== userId);
-    
-    // Add current user
-    const newParticipant: Participant = {
+    // Use presence to track participants
+    this.channel?.track({
       userId,
       userName,
       isMuted: false,
       timestamp: Date.now()
-    };
-    filteredParticipants.push(newParticipant);
-    
-    console.log(`Storing participants:`, filteredParticipants);
-    localStorage.setItem(participantsKey, JSON.stringify(filteredParticipants));
-    
-    // Broadcast to other tabs immediately
-    if (this.broadcastChannel) {
-      this.broadcastChannel.postMessage({
-        type: 'user-joined',
-        data: { userId, userName, roomId }
-      });
-      
-      // Send current participants to this user and others
-      this.broadcastChannel.postMessage({
-        type: 'room-participants',
-        data: { roomId, participants: filteredParticipants }
-      });
-    }
-    
-    // Emit locally as well for immediate update
-    setTimeout(() => {
-      this.emit('room-participants', filteredParticipants);
-    }, 50);
+    });
   }
 
   leaveRoom(roomId: string, userId: string) {
-    if (this.socket?.connected) {
-      this.socket.emit('leave-room', { roomId, userId });
-    } else {
-      // Remove from localStorage
-      const participantsKey = `room_${roomId}_participants`;
-      const participants = JSON.parse(localStorage.getItem(participantsKey) || '[]') as Participant[];
-      const filteredParticipants = participants.filter(p => p.userId !== userId);
-      localStorage.setItem(participantsKey, JSON.stringify(filteredParticipants));
+    // Broadcast user left
+    if (this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'user-left',
+        payload: { userId }
+      });
       
-      // Broadcast to other tabs
-      if (this.broadcastChannel) {
-        this.broadcastChannel.postMessage({
-          type: 'user-left',
-          data: userId
-        });
-      }
+      // Untrack presence
+      this.channel.untrack();
+      this.channel.unsubscribe();
     }
 
     this.currentRoomId = null;
     this.currentUserId = null;
     this.currentUserName = null;
+    this.channel = null;
   }
 
   sendSignal(roomId: string, signal: any, targetUserId: string) {
-    if (this.socket?.connected) {
-      this.socket.emit('signal', { roomId, signal, targetUserId });
-    } else {
-      // Use BroadcastChannel for local signaling
-      if (this.broadcastChannel) {
-        this.broadcastChannel.postMessage({
-          type: 'signal',
-          data: {
-            roomId,
-            signal,
-            fromUserId: this.currentUserId,
-            targetUserId,
-            timestamp: Date.now()
-          }
-        });
-      }
+    if (this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'signal',
+        payload: {
+          roomId,
+          signal,
+          fromUserId: this.currentUserId,
+          targetUserId,
+          timestamp: Date.now()
+        }
+      });
     }
   }
 
   sendMuteStatus(roomId: string, isMuted: boolean) {
-    if (this.socket?.connected) {
-      this.socket.emit('mute-status', { roomId, isMuted });
-    } else {
-      // Update localStorage
-      const participantsKey = `room_${roomId}_participants`;
-      const participants = JSON.parse(localStorage.getItem(participantsKey) || '[]') as Participant[];
-      const updatedParticipants = participants.map(p => 
-        p.userId === this.currentUserId ? { ...p, isMuted } : p
-      );
-      localStorage.setItem(participantsKey, JSON.stringify(updatedParticipants));
+    if (this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'user-mute-status',
+        payload: { userId: this.currentUserId, isMuted }
+      });
       
-      // Broadcast to other tabs
-      if (this.broadcastChannel) {
-        this.broadcastChannel.postMessage({
-          type: 'user-mute-status',
-          data: { userId: this.currentUserId, isMuted }
-        });
-      }
+      // Update presence
+      this.channel.track({
+        userId: this.currentUserId,
+        userName: this.currentUserName,
+        isMuted,
+        timestamp: Date.now()
+      });
     }
   }
 
@@ -232,13 +180,9 @@ class SocketService {
   }
 
   disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-    }
-    if (this.broadcastChannel) {
-      this.broadcastChannel.close();
-      this.broadcastChannel = null;
+    if (this.channel) {
+      this.channel.unsubscribe();
+      this.channel = null;
     }
     this.eventHandlers.clear();
   }

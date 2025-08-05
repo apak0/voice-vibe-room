@@ -295,26 +295,30 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       }
       
       if (streamRef.current && audioContextRef.current) {
-        // Create a test audio element to play back the microphone
-        const testAudio = document.createElement('audio');
-        testAudio.srcObject = streamRef.current;
-        testAudio.muted = false;
-        testAudio.volume = 0.5;
-        testAudioRef.current = testAudio;
+        // Create audio context for loopback
+        const source = audioContextRef.current.createMediaStreamSource(streamRef.current);
+        const gainNode = audioContextRef.current.createGain();
         
-        // Play the audio back to test the microphone
-        await testAudio.play();
+        // Set low gain to prevent feedback but allow hearing
+        gainNode.gain.value = 0.3;
+        
+        // Connect microphone to speakers through gain control
+        source.connect(gainNode);
+        gainNode.connect(audioContextRef.current.destination);
+        
+        testAudioRef.current = { source, gainNode } as any;
         
         toast({
-          title: "Microphone Test",
-          description: "You should hear your own voice if microphone is working. Test will stop in 5 seconds.",
+          title: "Microphone Test Active",
+          description: "You should hear your own voice. Speak into the microphone. Test will stop in 5 seconds.",
         });
         
         // Stop test after 5 seconds
         setTimeout(() => {
           if (testAudioRef.current) {
-            testAudioRef.current.pause();
-            testAudioRef.current.remove();
+            const { source, gainNode } = testAudioRef.current as any;
+            source.disconnect();
+            gainNode.disconnect();
             testAudioRef.current = null;
           }
           setIsTesting(false);

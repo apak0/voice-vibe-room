@@ -369,176 +369,199 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-background p-4 sm:p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <Card className="p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground mb-2">Voice Chat Room</h1>
-              <div className="flex items-center gap-4">
-                <p className="text-muted-foreground">Room ID: {roomId}</p>
-                <Button variant="ghost" size="sm" onClick={copyRoomId}>
-                  Copy ID
+        <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 backdrop-blur-sm border border-border/50 rounded-xl p-6 shadow-lg">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-2">
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Voice Chat Room
+              </h1>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                <span className="text-sm text-muted-foreground font-mono bg-muted/30 px-3 py-1 rounded-md">
+                  {roomId}
+                </span>
+                <Button variant="ghost" size="sm" onClick={copyRoomId} className="w-fit">
+                  Copy Room ID
                 </Button>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Users className="w-5 h-5" />
-              <span>{participants.length + peersCount} participant{(participants.length + peersCount) !== 1 ? 's' : ''}</span>
+            <div className="flex items-center gap-3 bg-card/50 backdrop-blur-sm border border-border/30 rounded-lg px-4 py-2">
+              <Users className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium">
+                {participants.length + peersCount} participant{(participants.length + peersCount) !== 1 ? 's' : ''}
+              </span>
               {peersCount > 0 && (
-                <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full">
+                <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">
                   {peersCount} connected
                 </span>
               )}
             </div>
           </div>
-        </Card>
-
-        {/* Debug Info */}
-        <Card className="p-4 mb-6 bg-muted/50">
-          <div className="text-sm text-muted-foreground">
-            <p><strong>Debug Info:</strong></p>
-            <p>Room ID: {roomId}</p>
-            <p>Your User ID: {userId}</p>
-            <p>Your Name: {userName}</p>
-            <p>Participants in state: {participants.length}</p>
-            <p>WebRTC peers: {peersCount}</p>
-            <div className="mt-2">
-              <p><strong>Participants:</strong></p>
-              {participants.map(p => (
-                <div key={p.id} className="ml-2">
-                  • {p.name} ({p.id.substring(0, 8)}...) {p.isMuted ? '🔇' : '🎤'} {p.isSpeaking ? '🗣️' : ''}
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        {/* Participants Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          {participants.map(participant => (
-            <Card 
-              key={participant.id} 
-              className={`p-4 transition-all duration-300 ${
-                participant.isSpeaking ? 'animate-pulse border-primary' : ''
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
-                    participant.isSpeaking ? 'bg-primary' : 'bg-muted'
-                  }`}>
-                    {participant.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">{participant.name}</p>
-                    <p className={`text-xs ${
-                      participant.isSpeaking ? 'text-primary' : 'text-muted-foreground'
-                    }`}>
-                      {participant.isSpeaking ? 'Speaking' : 'Quiet'}
-                    </p>
-                  </div>
-                </div>
-                {participant.isMuted && (
-                  <MicOff className="w-4 h-4 text-destructive" />
-                )}
-              </div>
-            </Card>
-          ))}
         </div>
 
-        {/* Voice Activity Indicator */}
-        <Card className="p-6 mb-6">
-          <div className="text-center">
-            <h3 className="text-lg font-semibold mb-4 text-foreground">Your Voice Activity</h3>
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <div className="w-64 h-2 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-primary transition-all duration-150"
-                  style={{ width: `${volumeLevel}%` }}
-                />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Panel - Participants */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Participants Grid */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-foreground">Participants</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {participants.map(participant => (
+                  <Card 
+                    key={participant.id} 
+                    className={`p-4 transition-all duration-300 border-2 ${
+                      participant.isSpeaking 
+                        ? 'border-primary shadow-lg shadow-primary/20 bg-primary/5' 
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`relative w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300 ${
+                          participant.isSpeaking 
+                            ? 'bg-primary text-primary-foreground scale-110 shadow-lg' 
+                            : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {participant.name.charAt(0).toUpperCase()}
+                          {participant.isSpeaking && (
+                            <div className="absolute inset-0 rounded-full border-2 border-primary animate-ping" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">{participant.name}</p>
+                          <p className={`text-xs transition-colors ${
+                            participant.isSpeaking ? 'text-primary font-medium' : 'text-muted-foreground'
+                          }`}>
+                            {participant.isSpeaking ? 'Speaking' : 'Quiet'}
+                          </p>
+                        </div>
+                      </div>
+                      {participant.isMuted && (
+                        <div className="p-2 rounded-full bg-destructive/10">
+                          <MicOff className="w-4 h-4 text-destructive" />
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                ))}
               </div>
-              <span className="text-sm text-muted-foreground w-12">
-                {Math.round(volumeLevel)}%
-              </span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {volumeLevel > 10 && !isMuted ? 'You are speaking' : 'You are quiet'}
-            </p>
-          </div>
-        </Card>
 
-        {/* Voice Testing */}
-        <Card className="p-6 mb-6">
-          <div className="text-center">
-            <h3 className="text-lg font-semibold mb-4 text-foreground">Voice Testing</h3>
-            <div className="flex items-center justify-center gap-4">
-              <Button
-                variant="outline"
-                onClick={testMicrophone}
-                disabled={isTesting}
-                className="flex items-center gap-2"
-              >
-                <Mic className="w-4 h-4" />
-                {isTesting ? 'Testing Microphone...' : 'Test Microphone'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={testSpeakers}
-                className="flex items-center gap-2"
-              >
-                <Volume2 className="w-4 h-4" />
-                Test Speakers
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Test your audio devices to ensure voice chat is working correctly
-            </p>
+            {/* Voice Testing */}
+            <Card className="p-6 bg-gradient-to-br from-card via-card to-muted/20">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Audio Testing</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={testMicrophone}
+                    disabled={isTesting}
+                    className="flex items-center gap-2 h-12 bg-background/50 hover:bg-primary/10 hover:border-primary/50"
+                  >
+                    <Mic className="w-4 h-4" />
+                    {isTesting ? 'Testing Microphone...' : 'Test Microphone'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={testSpeakers}
+                    className="flex items-center gap-2 h-12 bg-background/50 hover:bg-primary/10 hover:border-primary/50"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    Test Speakers
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Test your audio devices to ensure voice chat is working correctly
+                </p>
+              </div>
+            </Card>
           </div>
-        </Card>
 
-        {/* Controls */}
-        <Card className="p-6">
-          <div className="flex items-center justify-center gap-4">
-            <Button
-              variant={isMuted ? "destructive" : "outline"}
-              size="lg"
-              onClick={toggleMute}
-              className="w-16 h-16 rounded-full"
-            >
-              {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-            </Button>
-            
-            <Button
-              variant={isDeafened ? "destructive" : "outline"}
-              size="lg"
-              onClick={toggleDeafen}
-              className="w-16 h-16 rounded-full"
-            >
-              {isDeafened ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
-            </Button>
-            
-            <Button
-              variant="destructive"
-              size="lg"
-              onClick={leaveRoom}
-              className="w-16 h-16 rounded-full"
-            >
-              <PhoneOff className="w-6 h-6" />
-            </Button>
+          {/* Right Panel - Controls & Activity */}
+          <div className="space-y-6">
+            {/* Voice Activity */}
+            <Card className="p-6 bg-gradient-to-br from-primary/5 via-card to-accent/5">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground text-center">Voice Activity</h3>
+                <div className="space-y-3">
+                  <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-150 rounded-full"
+                      style={{ width: `${volumeLevel}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className={`font-medium transition-colors ${
+                      volumeLevel > 10 && !isMuted ? 'text-primary' : 'text-muted-foreground'
+                    }`}>
+                      {volumeLevel > 10 && !isMuted ? 'Speaking' : 'Quiet'}
+                    </span>
+                    <span className="text-muted-foreground font-mono">
+                      {Math.round(volumeLevel)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Controls */}
+            <Card className="p-6 bg-gradient-to-br from-card via-card to-primary/5">
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-foreground text-center">Controls</h3>
+                
+                <div className="flex justify-center gap-4">
+                  <Button
+                    variant={isMuted ? "destructive" : "outline"}
+                    size="lg"
+                    onClick={toggleMute}
+                    className="w-16 h-16 rounded-full transition-all duration-300 hover:scale-105"
+                  >
+                    {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                  </Button>
+                  
+                  <Button
+                    variant={isDeafened ? "destructive" : "outline"}
+                    size="lg"
+                    onClick={toggleDeafen}
+                    className="w-16 h-16 rounded-full transition-all duration-300 hover:scale-105"
+                  >
+                    {isDeafened ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                  </Button>
+                  
+                  <Button
+                    variant="destructive"
+                    size="lg"
+                    onClick={leaveRoom}
+                    className="w-16 h-16 rounded-full transition-all duration-300 hover:scale-105"
+                  >
+                    <PhoneOff className="w-6 h-6" />
+                  </Button>
+                </div>
+                
+                <div className="space-y-2 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {isMuted ? 'Microphone muted' : 'Microphone active'}
+                    {isDeafened ? ' • Audio deafened' : ' • Audio enabled'}
+                  </p>
+                  <div className="flex justify-center gap-2">
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      isConnected ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {isConnected ? 'Connected' : 'Connecting...'}
+                    </span>
+                    {peersCount > 0 && (
+                      <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded-full">
+                        {peersCount} WebRTC peers
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
           </div>
-          
-          <div className="mt-4 text-center space-y-1">
-            <p className="text-sm text-muted-foreground">
-              {isMuted ? 'Microphone muted' : 'Microphone active'}
-              {isDeafened ? ' • Audio deafened' : ' • Audio enabled'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Status: {isConnected ? 'Connected' : 'Connecting...'} • WebRTC: {peersCount > 0 ? `${peersCount} peers` : 'No peers'}
-            </p>
-          </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

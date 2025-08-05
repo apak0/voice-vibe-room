@@ -63,6 +63,30 @@ class SocketService {
       .on('broadcast', { event: 'user-mute-status' }, (payload) => {
         this.emit('user-mute-status', payload.payload);
       })
+      .on('presence', { event: 'sync' }, () => {
+        console.log('Presence sync event');
+        const state = this.channel?.presenceState();
+        console.log('Current presence state:', state);
+        if (state) {
+          const participants = Object.keys(state).map(key => {
+            const presences = state[key] as any[];
+            const presence = presences[0];
+            return {
+              userId: presence.userId,
+              userName: presence.userName,
+              isMuted: presence.isMuted || false
+            };
+          });
+          console.log('Participants from presence:', participants);
+          this.emit('room-participants', participants);
+        }
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        console.log('Presence join event:', key, newPresences);
+      })
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        console.log('Presence leave event:', key, leftPresences);
+      })
       .subscribe();
   }
 

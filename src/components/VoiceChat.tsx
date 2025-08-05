@@ -27,12 +27,14 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const [isDeafened, setIsDeafened] = useState(false);
   const [volumeLevel, setVolumeLevel] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [userId] = useState(() => uuidv4());
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const microphoneRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const testAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Initialize WebRTC connections
   const { peersCount } = useWebRTC(roomId, userId, userName, streamRef.current);
@@ -253,9 +255,17 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   };
 
   const toggleDeafen = () => {
-    setIsDeafened(!isDeafened);
+    const newDeafenState = !isDeafened;
+    setIsDeafened(newDeafenState);
+    
+    // Mute/unmute all remote audio elements
+    document.querySelectorAll('[id^="audio-"]').forEach((audioElement) => {
+      const audio = audioElement as HTMLAudioElement;
+      audio.muted = newDeafenState;
+    });
+    
     toast({
-      title: !isDeafened ? "Audio deafened" : "Audio enabled",
+      title: newDeafenState ? "Audio deafened" : "Audio enabled",
     });
   };
 
@@ -274,6 +284,75 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     }
     if (audioContextRef.current) {
       audioContextRef.current.close();
+    }
+  };
+
+  const testMicrophone = async () => {
+    setIsTesting(true);
+    try {
+      if (!streamRef.current) {
+        await initializeAudio();
+      }
+      
+      if (streamRef.current && audioContextRef.current) {
+        // Create a test audio element to play back the microphone
+        const testAudio = document.createElement('audio');
+        testAudio.srcObject = streamRef.current;
+        testAudio.muted = false;
+        testAudio.volume = 0.5;
+        testAudioRef.current = testAudio;
+        
+        // Play the audio back to test the microphone
+        await testAudio.play();
+        
+        toast({
+          title: "Microphone Test",
+          description: "You should hear your own voice if microphone is working. Test will stop in 5 seconds.",
+        });
+        
+        // Stop test after 5 seconds
+        setTimeout(() => {
+          if (testAudioRef.current) {
+            testAudioRef.current.pause();
+            testAudioRef.current.remove();
+            testAudioRef.current = null;
+          }
+          setIsTesting(false);
+          toast({
+            title: "Microphone test completed",
+          });
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error testing microphone:', error);
+      toast({
+        title: "Microphone test failed",
+        description: "Unable to access microphone for testing.",
+        variant: "destructive"
+      });
+      setIsTesting(false);
+    }
+  };
+
+  const testSpeakers = () => {
+    // Play a test tone
+    if (audioContextRef.current) {
+      const oscillator = audioContextRef.current.createOscillator();
+      const gainNode = audioContextRef.current.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContextRef.current.destination);
+      
+      oscillator.frequency.value = 440; // A4 note
+      gainNode.gain.value = 0.1;
+      
+      oscillator.start();
+      oscillator.stop(audioContextRef.current.currentTime + 1);
+      
+      toast({
+        title: "Speaker Test",
+        description: "You should hear a beep sound if speakers are working.",
+      });
     }
   };
 
@@ -382,6 +461,35 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
             </div>
             <p className="text-sm text-muted-foreground">
               {volumeLevel > 10 && !isMuted ? 'You are speaking' : 'You are quiet'}
+            </p>
+          </div>
+        </Card>
+
+        {/* Voice Testing */}
+        <Card className="p-6 mb-6">
+          <div className="text-center">
+            <h3 className="text-lg font-semibold mb-4 text-foreground">Voice Testing</h3>
+            <div className="flex items-center justify-center gap-4">
+              <Button
+                variant="outline"
+                onClick={testMicrophone}
+                disabled={isTesting}
+                className="flex items-center gap-2"
+              >
+                <Mic className="w-4 h-4" />
+                {isTesting ? 'Testing Microphone...' : 'Test Microphone'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={testSpeakers}
+                className="flex items-center gap-2"
+              >
+                <Volume2 className="w-4 h-4" />
+                Test Speakers
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Test your audio devices to ensure voice chat is working correctly
             </p>
           </div>
         </Card>

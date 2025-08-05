@@ -63,14 +63,34 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
       audioElement.controls = false;
       audioElement.style.display = 'none';
       audioElement.volume = 1.0;
+      audioElement.setAttribute('playsinline', 'true'); // Important for mobile
       document.body.appendChild(audioElement);
       console.log(`Created audio element for user: ${userId}`);
     }
 
     audioElement.srcObject = stream;
-    audioElement.play()
-      .then(() => console.log(`Successfully playing audio for user: ${userId}`))
-      .catch(error => console.error(`Error playing audio for user ${userId}:`, error));
+    
+    // Attempt to play with better error handling
+    const playPromise = audioElement.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log(`Successfully playing audio for user: ${userId}`);
+          console.log(`Audio element properties:`, {
+            paused: audioElement.paused,
+            muted: audioElement.muted,
+            volume: audioElement.volume,
+            readyState: audioElement.readyState
+          });
+        })
+        .catch(error => {
+          console.error(`Error playing audio for user ${userId}:`, error);
+          // Try to play again after a short delay
+          setTimeout(() => {
+            audioElement.play().catch(e => console.error(`Retry failed for ${userId}:`, e));
+          }, 100);
+        });
+    }
   }, []);
 
   const createOffer = useCallback(async (remoteUserId: string) => {

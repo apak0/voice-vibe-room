@@ -35,6 +35,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const microphoneRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const testAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const speakingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Initialize WebRTC connections - only after audio stream is ready
   const { peersCount } = useWebRTC(roomId, userId, userName, streamRef.current);
@@ -86,9 +88,30 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
 
       const handleUserSpeakingStatus = (data: { userId: string; isSpeaking: boolean }) => {
         console.log("User speaking status received:", data);
-        setParticipants(prev => prev.map(p => 
-          p.id === data.userId ? { ...p, isSpeaking: data.isSpeaking } : p
-        ));
+        
+        // Clear existing timeout for this user
+        const existingTimeout = speakingTimeoutsRef.current.get(data.userId);
+        if (existingTimeout) {
+          clearTimeout(existingTimeout);
+          speakingTimeoutsRef.current.delete(data.userId);
+        }
+        
+        if (data.isSpeaking) {
+          // Immediately show speaking state
+          setParticipants(prev => prev.map(p => 
+            p.id === data.userId ? { ...p, isSpeaking: true } : p
+          ));
+        } else {
+          // Delay hiding speaking state by 1 second
+          const timeout = setTimeout(() => {
+            setParticipants(prev => prev.map(p => 
+              p.id === data.userId ? { ...p, isSpeaking: false } : p
+            ));
+            speakingTimeoutsRef.current.delete(data.userId);
+          }, 1000);
+          
+          speakingTimeoutsRef.current.set(data.userId, timeout);
+        }
       };
 
       const handleUserLeft = (leftUserId: string) => {
@@ -213,17 +236,31 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       // Determine if currently speaking
       const currentlySpeaking = normalizedVolume > 10 && !isMuted;
       
-      // Update local participant state
-      setParticipants(prev => prev.map(p => 
-        p.name === userName 
-          ? { ...p, isSpeaking: currentlySpeaking }
-          : p
-      ));
-      
       // Broadcast speaking status change to other participants
       if (currentlySpeaking !== lastSpeakingState) {
         socketService.sendSpeakingStatus(roomId, currentlySpeaking);
         lastSpeakingState = currentlySpeaking;
+        
+        // Clear existing timeout
+        if (speakingTimeoutRef.current) {
+          clearTimeout(speakingTimeoutRef.current);
+          speakingTimeoutRef.current = null;
+        }
+        
+        if (currentlySpeaking) {
+          // Immediately show speaking state for current user
+          setParticipants(prev => prev.map(p => 
+            p.name === userName ? { ...p, isSpeaking: true } : p
+          ));
+        } else {
+          // Delay hiding speaking state by 1 second for current user
+          speakingTimeoutRef.current = setTimeout(() => {
+            setParticipants(prev => prev.map(p => 
+              p.name === userName ? { ...p, isSpeaking: false } : p
+            ));
+            speakingTimeoutRef.current = null;
+          }, 1000);
+        }
       }
       
       requestAnimationFrame(updateVolume);
@@ -279,6 +316,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   };
 
   const cleanup = () => {
+    // Clear speaking timeouts
+    if (speakingTimeoutRef.current) {
+      clearTimeout(speakingTimeoutRef.current);
+    }
+    speakingTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+    speakingTimeoutsRef.current.clear();
+    
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }

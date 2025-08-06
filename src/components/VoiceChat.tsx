@@ -36,7 +36,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const streamRef = useRef<MediaStream | null>(null);
   const testAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Initialize WebRTC connections
+  // Initialize WebRTC connections - only after audio stream is ready
   const { peersCount } = useWebRTC(roomId, userId, userName, streamRef.current);
 
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -44,126 +44,108 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   useEffect(() => {
     console.log(`Initializing VoiceChat for user: ${userName} (${userId}) in room: ${roomId}`);
     
-    initializeAudio();
-    
-    // Initialize with current user
-    setParticipants([
-      {
-        id: userId,
-        name: userName,
-        isSpeaking: false,
-        isMuted: false
-      }
-    ]);
-    
-    setIsConnected(true);
-    toast({
-      title: "Connected to voice chat",
-      description: `Joined room: ${roomId}`,
-    });
-
-    // Socket event listeners for participants
-    const handleUserJoined = (data: { userId: string; userName: string }) => {
-      console.log(`User joined event received:`, data);
-      if (data.userId !== userId) {
-        setParticipants(prev => {
-          const exists = prev.find(p => p.id === data.userId);
-          if (!exists) {
-            const newList = [...prev, {
-              id: data.userId,
-              name: data.userName,
-              isSpeaking: false,
-              isMuted: false
-            }];
-            console.log(`Added user to participants:`, newList);
-            return newList;
-          }
-          return prev;
-        });
-      }
-    };
-
-    const handleUserLeft = (leftUserId: string) => {
-      console.log(`User left event received:`, leftUserId);
-      setParticipants(prev => {
-        const newList = prev.filter(p => p.id !== leftUserId);
-        console.log(`Removed user from participants:`, newList);
-        return newList;
-      });
+    const initializeChat = async () => {
+      await initializeAudio();
       
-      // Clean up audio element for left user
-      const audioElement = audioElementsRef.current.get(leftUserId);
-      if (audioElement) {
-        audioElement.remove();
-        audioElementsRef.current.delete(leftUserId);
-      }
-    };
-
-    const handleRoomParticipants = (roomParticipants: { userId: string; userName: string }[]) => {
-      console.log('Room participants received:', roomParticipants);
-      
-      // Current user should always be included
-      const currentUserParticipant = {
-        id: userId,
-        name: userName,
-        isSpeaking: false,
-        isMuted: false
-      };
-
-      // Other participants
-      const otherParticipants = roomParticipants
-        .filter(p => p.userId !== userId)
-        .map(p => ({
-          id: p.userId,
-          name: p.userName,
+      // Initialize with current user
+      setParticipants([
+        {
+          id: userId,
+          name: userName,
           isSpeaking: false,
           isMuted: false
-        }));
+        }
+      ]);
       
-      const allParticipants = [currentUserParticipant, ...otherParticipants];
-      console.log('Setting all participants:', allParticipants);
-      setParticipants(allParticipants);
-    };
-
-    const handleUserMuteStatus = (data: { userId: string; isMuted: boolean }) => {
-      console.log(`User mute status received:`, data);
-      setParticipants(prev => prev.map(p => 
-        p.id === data.userId ? { ...p, isMuted: data.isMuted } : p
-      ));
-    };
-
-    // Update localStorage heartbeat for current user
-    const updateHeartbeat = () => {
-      const participantsKey = `room_${roomId}_participants`;
-      const storedParticipants = JSON.parse(localStorage.getItem(participantsKey) || '[]');
-      
-      // Update or add current user
-      const updatedParticipants = storedParticipants.filter((p: any) => p.userId !== userId);
-      updatedParticipants.push({
-        userId,
-        userName,
-        isMuted: false,
-        timestamp: Date.now()
+      setIsConnected(true);
+      toast({
+        title: "Connected to voice chat",
+        description: `Joined room: ${roomId}`,
       });
-      
-      localStorage.setItem(participantsKey, JSON.stringify(updatedParticipants));
+
+      // Socket event listeners for participants
+      const handleUserJoined = (data: { userId: string; userName: string }) => {
+        console.log(`User joined event received:`, data);
+        if (data.userId !== userId) {
+          setParticipants(prev => {
+            const exists = prev.find(p => p.id === data.userId);
+            if (!exists) {
+              const newList = [...prev, {
+                id: data.userId,
+                name: data.userName,
+                isSpeaking: false,
+                isMuted: false
+              }];
+              console.log(`Added user to participants:`, newList);
+              return newList;
+            }
+            return prev;
+          });
+        }
+      };
+
+      const handleUserLeft = (leftUserId: string) => {
+        console.log(`User left event received:`, leftUserId);
+        setParticipants(prev => {
+          const newList = prev.filter(p => p.id !== leftUserId);
+          console.log(`Removed user from participants:`, newList);
+          return newList;
+        });
+        
+        // Clean up audio element for left user
+        const audioElement = audioElementsRef.current.get(leftUserId);
+        if (audioElement) {
+          audioElement.remove();
+          audioElementsRef.current.delete(leftUserId);
+        }
+      };
+
+      const handleRoomParticipants = (roomParticipants: { userId: string; userName: string }[]) => {
+        console.log('Room participants received:', roomParticipants);
+        
+        // Current user should always be included
+        const currentUserParticipant = {
+          id: userId,
+          name: userName,
+          isSpeaking: false,
+          isMuted: false
+        };
+
+        // Other participants
+        const otherParticipants = roomParticipants
+          .filter(p => p.userId !== userId)
+          .map(p => ({
+            id: p.userId,
+            name: p.userName,
+            isSpeaking: false,
+            isMuted: false
+          }));
+        
+        const allParticipants = [currentUserParticipant, ...otherParticipants];
+        console.log('Setting all participants:', allParticipants);
+        setParticipants(allParticipants);
+      };
+
+      const handleUserMuteStatus = (data: { userId: string; isMuted: boolean }) => {
+        console.log(`User mute status received:`, data);
+        setParticipants(prev => prev.map(p => 
+          p.id === data.userId ? { ...p, isMuted: data.isMuted } : p
+        ));
+      };
+
+      // Set up event listeners
+      socketService.onUserJoined(handleUserJoined);
+      socketService.onUserLeft(handleUserLeft);
+      socketService.onRoomParticipants(handleRoomParticipants);
+      socketService.onUserMuteStatus(handleUserMuteStatus);
+
+      // Set up presence tracking for Supabase realtime - only call once
+      socketService.joinRoom(roomId, userId, userName);
     };
 
-    // Set up event listeners
-    socketService.onUserJoined(handleUserJoined);
-    socketService.onUserLeft(handleUserLeft);
-    socketService.onRoomParticipants(handleRoomParticipants);
-    socketService.onUserMuteStatus(handleUserMuteStatus);
-
-    // Update heartbeat every 5 seconds
-    const heartbeatInterval = setInterval(updateHeartbeat, 5000);
-    updateHeartbeat(); // Initial call
-
-    // Set up presence tracking for Supabase realtime
-    socketService.joinRoom(roomId, userId, userName);
+    initializeChat();
 
     return () => {
-      clearInterval(heartbeatInterval);
       cleanup();
     };
   }, [userId, userName, roomId]);

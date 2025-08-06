@@ -166,10 +166,13 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
   }, []);
 
   useEffect(() => {
-    const socket = socketRef.current;
+    // Only proceed if we have a local stream
+    if (!localStream) {
+      console.log('WebRTC: Waiting for local stream...');
+      return;
+    }
 
-    // Join room
-    socketService.joinRoom(roomId, userId, userName);
+    console.log('WebRTC: Setting up with local stream');
 
     // Set up event listeners
     socketService.onUserJoined(addUser);
@@ -185,11 +188,8 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
 
       // Remove audio elements
       document.querySelectorAll('[id^="audio-"]').forEach(el => el.remove());
-
-      // Leave room
-      socketService.leaveRoom(roomId, userId);
     };
-  }, [roomId, userId, addUser, removeUser, handleSignal]);
+  }, [localStream, addUser, removeUser, handleSignal]);
 
   return {
     peersCount: peersRef.current.size,

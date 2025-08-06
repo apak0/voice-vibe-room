@@ -64,7 +64,19 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
-
+  
+  /* Animation delays for staggered effects */
+  .animation-delay-100 {
+    animation-delay: 0.1s;
+  }
+  
+  .animation-delay-200 {
+    animation-delay: 0.2s;
+  }
+  
+  .animation-delay-400 {
+    animation-delay: 0.4s;
+  }
 @layer base {
   * {
     @apply border-border;

@@ -393,35 +393,62 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                 {participants.map(participant => (
                   <Card 
                     key={participant.id} 
-                    className={`p-4 transition-all duration-300 border-2 ${
+                    className={`p-4 transition-all duration-300 border-2 relative overflow-hidden ${
                       participant.isSpeaking 
-                        ? 'border-primary shadow-lg shadow-primary/20 bg-primary/5' 
+                        ? 'border-primary shadow-lg shadow-primary/30 bg-gradient-to-br from-primary/10 to-primary/5 animate-pulse' 
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
+                    {/* Speaking wave effect */}
+                    {participant.isSpeaking && (
+                      <div className="absolute inset-0 pointer-events-none">
+                        <div className="absolute inset-0 border-2 border-primary/30 rounded-lg animate-ping" />
+                        <div className="absolute inset-2 border border-primary/20 rounded-lg animate-ping animation-delay-100" />
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between relative z-10">
                       <div className="flex items-center gap-3">
                         <div className={`relative w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300 ${
                           participant.isSpeaking 
-                            ? 'bg-primary text-primary-foreground scale-110 shadow-lg' 
-                            : 'bg-muted text-muted-foreground'
+                            ? 'bg-primary text-primary-foreground scale-110 shadow-lg shadow-primary/50 animate-pulse' 
+                            : 'bg-muted text-muted-foreground hover:scale-105'
                         }`}>
                           {participant.name.charAt(0).toUpperCase()}
+                          
+                          {/* Multiple ring animations for speaking */}
                           {participant.isSpeaking && (
-                            <div className="absolute inset-0 rounded-full border-2 border-primary animate-ping" />
+                            <>
+                              <div className="absolute inset-0 rounded-full border-2 border-primary animate-ping" />
+                              <div className="absolute -inset-1 rounded-full border border-primary/50 animate-ping animation-delay-200" />
+                              <div className="absolute -inset-2 rounded-full border border-primary/30 animate-ping animation-delay-400" />
+                            </>
                           )}
                         </div>
                         <div>
-                          <p className="font-medium text-foreground">{participant.name}</p>
-                          <p className={`text-xs transition-colors ${
-                            participant.isSpeaking ? 'text-primary font-medium' : 'text-muted-foreground'
+                          <p className={`font-medium transition-all duration-300 ${
+                            participant.isSpeaking ? 'text-primary scale-105' : 'text-foreground'
                           }`}>
-                            {participant.isSpeaking ? 'Speaking' : 'Quiet'}
+                            {participant.name}
+                          </p>
+                          <p className={`text-xs transition-all duration-300 font-medium ${
+                            participant.isSpeaking 
+                              ? 'text-primary animate-pulse' 
+                              : 'text-muted-foreground'
+                          }`}>
+                            {participant.isSpeaking ? (
+                              <span className="flex items-center gap-1">
+                                🔊 Speaking
+                                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
+                              </span>
+                            ) : (
+                              'Quiet'
+                            )}
                           </p>
                         </div>
                       </div>
                       {participant.isMuted && (
-                        <div className="p-2 rounded-full bg-destructive/10">
+                        <div className="p-2 rounded-full bg-destructive/10 animate-pulse">
                           <MicOff className="w-4 h-4 text-destructive" />
                         </div>
                       )}

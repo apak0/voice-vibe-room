@@ -63,6 +63,9 @@ class SocketService {
       .on('broadcast', { event: 'user-mute-status' }, (payload) => {
         this.emit('user-mute-status', payload.payload);
       })
+      .on('broadcast', { event: 'user-speaking-status' }, (payload) => {
+        this.emit('user-speaking-status', payload.payload);
+      })
       .on('presence', { event: 'sync' }, () => {
         console.log('Presence sync event');
         const state = this.channel?.presenceState();
@@ -183,6 +186,16 @@ class SocketService {
     }
   }
 
+  sendSpeakingStatus(roomId: string, isSpeaking: boolean) {
+    if (this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'user-speaking-status',
+        payload: { userId: this.currentUserId, isSpeaking }
+      });
+    }
+  }
+
   onUserJoined(callback: (data: { userId: string; userName: string }) => void) {
     this.on('user-joined', callback);
   }
@@ -201,6 +214,10 @@ class SocketService {
 
   onUserMuteStatus(callback: (data: { userId: string; isMuted: boolean }) => void) {
     this.on('user-mute-status', callback);
+  }
+
+  onUserSpeakingStatus(callback: (data: { userId: string; isSpeaking: boolean }) => void) {
+    this.on('user-speaking-status', callback);
   }
 
   disconnect() {

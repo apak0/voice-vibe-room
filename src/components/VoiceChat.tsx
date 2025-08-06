@@ -84,6 +84,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         }
       };
 
+      const handleUserSpeakingStatus = (data: { userId: string; isSpeaking: boolean }) => {
+        console.log("User speaking status received:", data);
+        setParticipants(prev => prev.map(p => 
+          p.id === data.userId ? { ...p, isSpeaking: data.isSpeaking } : p
+        ));
+      };
+
       const handleUserLeft = (leftUserId: string) => {
         console.log(`User left event received:`, leftUserId);
         setParticipants(prev => {
@@ -138,6 +145,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       socketService.onUserLeft(handleUserLeft);
       socketService.onRoomParticipants(handleRoomParticipants);
       socketService.onUserMuteStatus(handleUserMuteStatus);
+      socketService.onUserSpeakingStatus(handleUserSpeakingStatus);
 
       // Set up presence tracking for Supabase realtime - only call once
       socketService.joinRoom(roomId, userId, userName);
@@ -189,6 +197,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     if (!analyserRef.current) return;
     
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    let lastSpeakingState = false;
     
     const updateVolume = () => {
       if (!analyserRef.current) return;
@@ -201,12 +210,21 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       
       setVolumeLevel(normalizedVolume);
       
-      // Update speaking status for current user
+      // Determine if currently speaking
+      const currentlySpeaking = normalizedVolume > 10 && !isMuted;
+      
+      // Update local participant state
       setParticipants(prev => prev.map(p => 
         p.name === userName 
-          ? { ...p, isSpeaking: normalizedVolume > 10 && !isMuted }
+          ? { ...p, isSpeaking: currentlySpeaking }
           : p
       ));
+      
+      // Broadcast speaking status change to other participants
+      if (currentlySpeaking !== lastSpeakingState) {
+        socketService.sendSpeakingStatus(roomId, currentlySpeaking);
+        lastSpeakingState = currentlySpeaking;
+      }
       
       requestAnimationFrame(updateVolume);
     };

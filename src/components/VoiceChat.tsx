@@ -457,15 +457,15 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                     key={participant.id} 
                     className={`p-4 transition-all duration-300 border-2 relative overflow-hidden ${
                       participant.isSpeaking 
-                        ? 'border-primary shadow-lg shadow-primary/30 bg-gradient-to-br from-primary/10 to-primary/5 animate-pulse' 
+                        ? 'border-primary shadow-lg shadow-primary/50 bg-gradient-to-br from-primary/15 to-primary/10' 
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    {/* Speaking wave effect */}
+                    {/* Speaking glow effect */}
                     {participant.isSpeaking && (
                       <div className="absolute inset-0 pointer-events-none">
-                        <div className="absolute inset-0 border-2 border-primary/30 rounded-lg animate-ping" />
-                        <div className="absolute inset-2 border border-primary/20 rounded-lg animate-ping animation-delay-100" />
+                        <div className="absolute inset-0 bg-primary/5 rounded-lg" />
+                        <div className="absolute inset-0 border-2 border-primary/40 rounded-lg" />
                       </div>
                     )}
                     
@@ -473,17 +473,17 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                       <div className="flex items-center gap-3">
                         <div className={`relative w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300 ${
                           participant.isSpeaking 
-                            ? 'bg-primary text-primary-foreground scale-110 shadow-lg shadow-primary/50 animate-pulse' 
+                            ? 'bg-primary text-primary-foreground scale-110 shadow-lg shadow-primary/60' 
                             : 'bg-muted text-muted-foreground hover:scale-105'
                         }`}>
                           {participant.name.charAt(0).toUpperCase()}
                           
-                          {/* Multiple ring animations for speaking */}
+                          {/* Steady glow ring for speaking */}
                           {participant.isSpeaking && (
                             <>
-                              <div className="absolute inset-0 rounded-full border-2 border-primary animate-ping" />
-                              <div className="absolute -inset-1 rounded-full border border-primary/50 animate-ping animation-delay-200" />
-                              <div className="absolute -inset-2 rounded-full border border-primary/30 animate-ping animation-delay-400" />
+                              <div className="absolute inset-0 rounded-full border-2 border-primary/60" />
+                              <div className="absolute -inset-1 rounded-full border border-primary/40" />
+                              <div className="absolute -inset-2 rounded-full border border-primary/20" />
                             </>
                           )}
                         </div>
@@ -495,13 +495,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                           </p>
                           <p className={`text-xs transition-all duration-300 font-medium ${
                             participant.isSpeaking 
-                              ? 'text-primary animate-pulse' 
+                              ? 'text-primary' 
                               : 'text-muted-foreground'
                           }`}>
                             {participant.isSpeaking ? (
                               <span className="flex items-center gap-1">
                                 🔊 Speaking
-                                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
+                                <span className="inline-block w-2 h-2 bg-primary rounded-full" />
                               </span>
                             ) : (
                               'Quiet'

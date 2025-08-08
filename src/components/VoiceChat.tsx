@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -22,6 +23,7 @@ interface VoiceChatProps {
 }
 
 export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userName }) => {
+  const { t } = useTranslation();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
@@ -61,8 +63,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       
       setIsConnected(true);
       toast({
-        title: "Connected to voice chat",
-        description: `Joined room: ${roomId}`,
+        title: t('connected'),
+        description: `${t('roomId')}: ${roomId}`,
       });
 
       // Socket event listeners for participants
@@ -209,8 +211,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     } catch (error) {
       console.error('Error accessing microphone:', error);
       toast({
-        title: "Microphone access denied",
-        description: "Please allow microphone access to join voice chat.",
+        title: t('microphoneAccess'),
+        description: t('microphoneAccess'),
         variant: "destructive"
       });
     }
@@ -286,7 +288,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       socketService.sendMuteStatus(roomId, !isMuted);
       
       toast({
-        title: !isMuted ? "Microphone muted" : "Microphone unmuted",
+        title: !isMuted ? t('mute') : t('unmute'),
       });
     }
   };
@@ -302,7 +304,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     });
     
     toast({
-      title: newDeafenState ? "Audio deafened" : "Audio enabled",
+      title: newDeafenState ? t('deafen') : t('undeafen'),
     });
   };
 
@@ -310,8 +312,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     cleanup();
     onLeaveRoom();
     toast({
-      title: "Left voice chat",
-      description: "You have disconnected from the room.",
+      title: t('leaveRoom'),
+      description: t('disconnected'),
     });
   };
 
@@ -353,8 +355,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         testAudioRef.current = { source, gainNode } as any;
         
         toast({
-          title: "Microphone Test Active",
-          description: "You should hear your own voice. Speak into the microphone. Test will stop in 5 seconds.",
+          title: t('testMicrophone'),
+          description: t('audioTesting'),
         });
         
         // Stop test after 5 seconds
@@ -367,7 +369,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           }
           setIsTesting(false);
           toast({
-            title: "Microphone test completed",
+            title: t('testMicrophone'),
           });
         }, 5000);
       }
@@ -398,8 +400,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       oscillator.stop(audioContextRef.current.currentTime + 1);
       
       toast({
-        title: "Speaker Test",
-        description: "You should hear a beep sound if speakers are working.",
+        title: t('testSpeakers'),
+        description: t('audioTesting'),
       });
     }
   };
@@ -407,8 +409,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId);
     toast({
-      title: "Room ID copied!",
-      description: "Share this ID with friends to invite them.",
+      title: t('roomIdCopied'),
     });
   };
 
@@ -420,25 +421,25 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-2">
               <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Voice Chat Room
+                {t('welcome')}
               </h1>
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                 <span className="text-sm text-muted-foreground font-mono bg-muted/30 px-3 py-1 rounded-md">
                   {roomId}
                 </span>
                 <Button variant="ghost" size="sm" onClick={copyRoomId} className="w-fit">
-                  Copy Room ID
+                  {t('copyRoomId')}
                 </Button>
               </div>
             </div>
             <div className="flex items-center gap-3 bg-card/50 backdrop-blur-sm border border-border/30 rounded-lg px-4 py-2">
               <Users className="w-5 h-5 text-primary" />
               <span className="text-sm font-medium">
-                {participants.length + peersCount} participant{(participants.length + peersCount) !== 1 ? 's' : ''}
+                {t('participants')}: {participants.length + peersCount}
               </span>
               {peersCount > 0 && (
                 <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">
-                  {peersCount} connected
+                  {peersCount} {t('connected')}
                 </span>
               )}
             </div>
@@ -450,7 +451,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           <div className="lg:col-span-2 space-y-6">
             {/* Participants Grid */}
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">Participants</h2>
+              <h2 className="text-lg font-semibold text-foreground">{t('participants')}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {participants.map(participant => (
                   <Card 
@@ -500,11 +501,11 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                           }`}>
                             {participant.isSpeaking ? (
                               <span className="flex items-center gap-1">
-                                🔊 Speaking
+                                🔊 {t('speaking')}
                                 <span className="inline-block w-2 h-2 bg-primary rounded-full" />
                               </span>
                             ) : (
-                              'Quiet'
+                              (participant.isMuted ? t('muted') : t('participant'))
                             )}
                           </p>
                         </div>
@@ -523,7 +524,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
             {/* Voice Testing */}
             <Card className="p-6 bg-gradient-to-br from-card via-card to-muted/20">
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-foreground">Audio Testing</h3>
+                <h3 className="text-lg font-semibold text-foreground">{t('audioTesting')}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Button
                     variant="outline"
@@ -532,7 +533,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                     className="flex items-center gap-2 h-12 bg-background/50 hover:bg-primary/10 hover:border-primary/50"
                   >
                     <Mic className="w-4 h-4" />
-                    {isTesting ? 'Testing Microphone...' : 'Test Microphone'}
+                    {isTesting ? t('audioTesting') : t('testMicrophone')}}
                   </Button>
                   <Button
                     variant="outline"
@@ -540,11 +541,11 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                     className="flex items-center gap-2 h-12 bg-background/50 hover:bg-primary/10 hover:border-primary/50"
                   >
                     <Volume2 className="w-4 h-4" />
-                    Test Speakers
+                    {t('testSpeakers')}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">
-                  Test your audio devices to ensure voice chat is working correctly
+                  {t('audioTesting')}
                 </p>
               </div>
             </Card>
@@ -555,7 +556,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
             {/* Voice Activity */}
             <Card className="p-6 bg-gradient-to-br from-primary/5 via-card to-accent/5">
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-foreground text-center">Voice Activity</h3>
+                <h3 className="text-lg font-semibold text-foreground text-center">{t('voiceActivity')}</h3>
                 <div className="space-y-3">
                   <div className="relative h-3 bg-muted rounded-full overflow-hidden">
                     <div 
@@ -567,7 +568,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                     <span className={`font-medium transition-colors ${
                       volumeLevel > 10 && !isMuted ? 'text-primary' : 'text-muted-foreground'
                     }`}>
-                      {volumeLevel > 10 && !isMuted ? 'Speaking' : 'Quiet'}
+                      {volumeLevel > 10 && !isMuted ? t('speaking') : t('participant')}
                     </span>
                     <span className="text-muted-foreground font-mono">
                       {Math.round(volumeLevel)}%
@@ -580,7 +581,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
             {/* Controls */}
             <Card className="p-6 bg-gradient-to-br from-card via-card to-primary/5">
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-foreground text-center">Controls</h3>
+                <h3 className="text-lg font-semibold text-foreground text-center">{t('connectionStatus')}</h3>
                 
                 <div className="flex justify-center gap-4">
                   <Button
@@ -613,20 +614,16 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                 
                 <div className="space-y-2 text-center">
                   <p className="text-sm text-muted-foreground">
-                    {isMuted ? 'Microphone muted' : 'Microphone active'}
-                    {isDeafened ? ' • Audio deafened' : ' • Audio enabled'}
+                  {t(isMuted ? 'mute' : 'unmute')}
+                  {' • '}
+                  {t(isDeafened ? 'deafen' : 'undeafen')}
                   </p>
                   <div className="flex justify-center gap-2">
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       isConnected ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                     }`}>
-                      {isConnected ? 'Connected' : 'Connecting...'}
+                      {isConnected ? t('connected') : t('connecting')}
                     </span>
-                    {peersCount > 0 && (
-                      <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded-full">
-                        {peersCount} WebRTC peers
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>

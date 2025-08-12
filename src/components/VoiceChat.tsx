@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { Mic, MicOff, Phone, PhoneOff, Users, Volume2, VolumeX } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,6 +31,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const [volumeLevel, setVolumeLevel] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [pushToTalk, setPushToTalk] = useState(false);
+  const [pttActive, setPttActive] = useState(false);
   const [userId] = useState(() => uuidv4());
   
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -308,6 +311,58 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     });
   };
 
+  // Push-to-talk controls
+  const setMicEnabled = (enabled: boolean) => {
+    if (streamRef.current) {
+      streamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = enabled;
+      });
+    }
+    setIsMuted(!enabled);
+    setParticipants(prev => prev.map(p => p.id === userId ? { ...p, isMuted: !enabled } : p));
+    socketService.sendMuteStatus(roomId, !enabled);
+  };
+
+  const handlePTTDown = () => {
+    if (!pushToTalk || pttActive) return;
+    setPttActive(true);
+    setMicEnabled(true);
+  };
+
+  const handlePTTUp = () => {
+    if (!pushToTalk || !pttActive) return;
+    setPttActive(false);
+    setMicEnabled(false);
+  };
+
+  useEffect(() => {
+    if (!pushToTalk) return;
+    // Ensure mic is muted when enabling PTT
+    setMicEnabled(false);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handlePTTDown();
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handlePTTUp();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      if (pttActive) {
+        setPttActive(false);
+        setMicEnabled(false);
+      }
+    };
+  }, [pushToTalk]);
+
   const leaveRoom = () => {
     cleanup();
     onLeaveRoom();
@@ -533,7 +588,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                     className="flex items-center gap-2 h-12 bg-background/50 hover:bg-primary/10 hover:border-primary/50"
                   >
                     <Mic className="w-4 h-4" />
-                    {isTesting ? t('audioTesting') : t('testMicrophone')}}
+                    {isTesting ? t('audioTesting') : t('testMicrophone')}
                   </Button>
                   <Button
                     variant="outline"
@@ -583,11 +638,21 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
               <div className="space-y-6">
                 <h3 className="text-lg font-semibold text-foreground text-center">{t('connectionStatus')}</h3>
                 
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{t('pushToTalk')}</p>
+                    <p className="text-sm text-muted-foreground">{t('holdSpaceToTalk')}</p>
+                  </div>
+                  <Switch checked={pushToTalk} onCheckedChange={(v) => setPushToTalk(v)} />
+                </div>
+                
                 <div className="flex justify-center gap-4">
                   <Button
                     variant={isMuted ? "destructive" : "outline"}
                     size="lg"
                     onClick={toggleMute}
+                    disabled={pushToTalk}
+                    title={pushToTalk ? t('pushToTalkEnabled') : undefined}
                     className="w-16 h-16 rounded-full transition-all duration-300 hover:scale-105"
                   >
                     {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
@@ -611,6 +676,19 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                     <PhoneOff className="w-6 h-6" />
                   </Button>
                 </div>
+                
+                <Button
+                  onMouseDown={handlePTTDown}
+                  onMouseUp={handlePTTUp}
+                  onMouseLeave={handlePTTUp}
+                  onTouchStart={(e) => { e.preventDefault(); handlePTTDown(); }}
+                  onTouchEnd={handlePTTUp}
+                  disabled={!pushToTalk}
+                  variant={pttActive ? 'default' : 'outline'}
+                  className="w-full h-12 rounded-full"
+                >
+                  {pttActive ? t('talking') : t('holdToTalk')}
+                </Button>
                 
                 <div className="space-y-2 text-center">
                   <p className="text-sm text-muted-foreground">

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Mic, MicOff, Phone, PhoneOff, Users, Volume2, VolumeX } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff, Users, Volume2, VolumeX, Copy } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { useWebRTC } from '@/hooks/useWebRTC';
@@ -483,7 +483,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                   {roomId}
                 </span>
                 <Button variant="ghost" size="sm" onClick={copyRoomId} className="w-fit">
-                  {t('copyRoomId')}
+                  <Copy className="w-4 h-4" />
                 </Button>
               </div>
             </div>

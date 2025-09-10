@@ -43,7 +43,8 @@ const resources = {
       "holdSpaceToTalk": "Hold Space key or press button below to talk",
       "pushToTalkEnabled": "Push to Talk is enabled - manual mute disabled",
       "talking": "Talking...",
-      "holdToTalk": "Hold to Talk"
+      "holdToTalk": "Hold to Talk",
+      "creatingRoom": "Creating Room..."
     }
   },
   tr: {
@@ -85,7 +86,8 @@ const resources = {
       "holdSpaceToTalk": "Konuşmak için Space tuşuna basılı tutun veya aşağıdaki butona basın",
       "pushToTalkEnabled": "Basılı Tutarak Konuş etkin - manuel susturma devre dışı",
       "talking": "Konuşuyor...",
-      "holdToTalk": "Konuşmak İçin Basılı Tut"
+      "holdToTalk": "Konuşmak İçin Basılı Tut",
+      "creatingRoom": "Oda Oluşturuluyor..."
     }
   }
 };

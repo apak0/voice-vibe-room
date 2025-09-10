@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Mic, MicOff, Phone, PhoneOff, Users, Volume2, VolumeX, Copy } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff, Users, Volume2, VolumeX, Copy, Video, VideoOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { useWebRTC } from '@/hooks/useWebRTC';
@@ -15,6 +15,7 @@ interface Participant {
   name: string;
   isSpeaking: boolean;
   isMuted: boolean;
+  hasVideo: boolean;
 }
 
 interface VoiceChatProps {
@@ -28,6 +29,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
   const [volumeLevel, setVolumeLevel] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -39,6 +41,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const analyserRef = useRef<AnalyserNode | null>(null);
   const microphoneRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const testAudioRef = useRef<HTMLAudioElement | null>(null);
   const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const speakingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -60,7 +63,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           id: userId,
           name: userName,
           isSpeaking: false,
-          isMuted: false
+          isMuted: false,
+          hasVideo: isVideoEnabled
         }
       ]);
       
@@ -81,7 +85,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                 id: data.userId,
                 name: data.userName,
                 isSpeaking: false,
-                isMuted: false
+                isMuted: false,
+                hasVideo: false
               }];
               console.log(`Added user to participants:`, newList);
               return newList;
@@ -101,37 +106,35 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           speakingTimeoutsRef.current.delete(data.userId);
         }
         
-        if (data.isSpeaking) {
-          // Immediately show speaking state
-          setParticipants(prev => prev.map(p => 
-            p.id === data.userId ? { ...p, isSpeaking: true } : p
-          ));
-        } else {
-          // Delay hiding speaking state by 1 second
-          const timeout = setTimeout(() => {
+        // Update speaking status
+        setParticipants(prev => prev.map(p => 
+          p.id === data.userId 
+            ? { ...p, isSpeaking: data.isSpeaking } 
+            : p
+        ));
+        
+        // If they stopped speaking, set a timeout to ensure UI updates
+        if (!data.isSpeaking) {
+          const timeoutId = setTimeout(() => {
             setParticipants(prev => prev.map(p => 
               p.id === data.userId ? { ...p, isSpeaking: false } : p
             ));
             speakingTimeoutsRef.current.delete(data.userId);
-          }, 1000);
+          }, 500);
           
-          speakingTimeoutsRef.current.set(data.userId, timeout);
+          speakingTimeoutsRef.current.set(data.userId, timeoutId);
         }
       };
 
       const handleUserLeft = (leftUserId: string) => {
-        console.log(`User left event received:`, leftUserId);
-        setParticipants(prev => {
-          const newList = prev.filter(p => p.id !== leftUserId);
-          console.log(`Removed user from participants:`, newList);
-          return newList;
-        });
+        console.log(`User left event received: ${leftUserId}`);
+        setParticipants(prev => prev.filter(p => p.id !== leftUserId));
         
-        // Clean up audio element for left user
-        const audioElement = audioElementsRef.current.get(leftUserId);
-        if (audioElement) {
-          audioElement.remove();
-          audioElementsRef.current.delete(leftUserId);
+        // Clear any speaking timeout for this user
+        const timeoutId = speakingTimeoutsRef.current.get(leftUserId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          speakingTimeoutsRef.current.delete(leftUserId);
         }
       };
 
@@ -143,7 +146,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           id: userId,
           name: userName,
           isSpeaking: false,
-          isMuted: false
+          isMuted: false,
+          hasVideo: isVideoEnabled
         };
 
         // Other participants
@@ -153,7 +157,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
             id: p.userId,
             name: p.userName,
             isSpeaking: false,
-            isMuted: false
+            isMuted: false,
+            hasVideo: false
           }));
         
         const allParticipants = [currentUserParticipant, ...otherParticipants];
@@ -188,15 +193,28 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
 
   const initializeAudio = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const constraints = { 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
-        } 
-      });
+        },
+        video: isVideoEnabled ? {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        } : false
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       streamRef.current = stream;
+      
+      // Set up local video if enabled
+      if (isVideoEnabled && videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
       
       // Create audio context for volume analysis
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -212,7 +230,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       monitorVolume();
       
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      console.error('Error accessing microphone/camera:', error);
       toast({
         title: t('microphoneAccess'),
         description: t('microphoneAccess'),
@@ -238,8 +256,10 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       
       setVolumeLevel(normalizedVolume);
       
-      // Determine if currently speaking
-      const currentlySpeaking = normalizedVolume > 10 && !isMuted;
+      // Determine if currently speaking (only if not push-to-talk mode)
+      const currentlySpeaking = pushToTalk 
+        ? pttActive && normalizedVolume > 5  
+        : normalizedVolume > 10 && !isMuted;
       
       // Broadcast speaking status change to other participants
       if (currentlySpeaking !== lastSpeakingState) {
@@ -249,21 +269,21 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         // Clear existing timeout
         if (speakingTimeoutRef.current) {
           clearTimeout(speakingTimeoutRef.current);
-          speakingTimeoutRef.current = null;
         }
         
+        // Update local participant speaking status
+        setParticipants(prev => prev.map(p => 
+          p.id === userId ? { ...p, isSpeaking: currentlySpeaking } : p
+        ));
+        
+        // Set timeout to stop speaking indication if no more activity
         if (currentlySpeaking) {
-          // Immediately show speaking state for current user
-          setParticipants(prev => prev.map(p => 
-            p.name === userName ? { ...p, isSpeaking: true } : p
-          ));
-        } else {
-          // Delay hiding speaking state by 1 second for current user
           speakingTimeoutRef.current = setTimeout(() => {
             setParticipants(prev => prev.map(p => 
-              p.name === userName ? { ...p, isSpeaking: false } : p
+              p.id === userId ? { ...p, isSpeaking: false } : p
             ));
-            speakingTimeoutRef.current = null;
+            socketService.sendSpeakingStatus(roomId, false);
+            lastSpeakingState = false;
           }, 1000);
         }
       }
@@ -274,129 +294,234 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     updateVolume();
   };
 
+  const cleanup = () => {
+    // Stop all tracks
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    
+    // Cleanup audio context
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close();
+    }
+    
+    // Clear timeouts
+    if (speakingTimeoutRef.current) {
+      clearTimeout(speakingTimeoutRef.current);
+    }
+    
+    speakingTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+    speakingTimeoutsRef.current.clear();
+    
+    // Leave room
+    socketService.leaveRoom(roomId, userId);
+    socketService.disconnect();
+  };
+
   const toggleMute = () => {
+    if (pushToTalk) return; // Can't manually mute in push-to-talk mode
+    
     if (streamRef.current) {
       const audioTracks = streamRef.current.getAudioTracks();
       audioTracks.forEach(track => {
-        track.enabled = isMuted;
-      });
-      setIsMuted(!isMuted);
-      
-      // Update local participant state
-      setParticipants(prev => prev.map(p => 
-        p.id === userId ? { ...p, isMuted: !isMuted } : p
-      ));
-      
-      // Send mute status to other users
-      socketService.sendMuteStatus(roomId, !isMuted);
-      
-      toast({
-        title: !isMuted ? t('mute') : t('unmute'),
+        track.enabled = isMuted; // Flip the current state
       });
     }
+    
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+    
+    // Update participant list to reflect mute status
+    setParticipants(prev => prev.map(p => 
+      p.id === userId ? { ...p, isMuted: newMutedState } : p
+    ));
+    
+    // Broadcast mute status to other participants
+    socketService.sendMuteStatus(roomId, newMutedState);
+    
+    toast({
+      title: newMutedState ? t('mute') : t('unmute'),
+      description: newMutedState ? "Microphone muted" : "Microphone unmuted",
+    });
   };
 
   const toggleDeafen = () => {
-    const newDeafenState = !isDeafened;
-    setIsDeafened(newDeafenState);
+    const newDeafenedState = !isDeafened;
+    setIsDeafened(newDeafenedState);
     
-    // Mute/unmute all remote audio elements
+    // Control all remote audio elements
     document.querySelectorAll('[id^="audio-"]').forEach((audioElement) => {
       const audio = audioElement as HTMLAudioElement;
-      audio.muted = newDeafenState;
+      audio.muted = newDeafenedState;
     });
     
     toast({
-      title: newDeafenState ? t('deafen') : t('undeafen'),
+      title: newDeafenedState ? t('deafen') : t('undeafen'),
+      description: newDeafenedState ? "All audio deafened" : "Audio restored",
     });
   };
 
-  // Push-to-talk controls
-  const setMicEnabled = (enabled: boolean) => {
-    if (streamRef.current) {
-      streamRef.current.getAudioTracks().forEach(track => {
-        track.enabled = enabled;
+  const toggleVideo = async () => {
+    if (!streamRef.current) return;
+    
+    try {
+      if (isVideoEnabled) {
+        // Disable video - remove video tracks
+        const videoTracks = streamRef.current.getVideoTracks();
+        videoTracks.forEach(track => {
+          track.stop();
+          streamRef.current?.removeTrack(track);
+        });
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
+        
+        setIsVideoEnabled(false);
+        toast({
+          title: "Video disabled",
+          description: "Camera has been turned off.",
+        });
+      } else {
+        // Enable video - get new stream with video
+        const constraints = {
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          },
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30 }
+          }
+        };
+        
+        // Stop current stream and get new one with video
+        const oldStream = streamRef.current;
+        const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // Stop old tracks
+        oldStream.getTracks().forEach(track => track.stop());
+        
+        streamRef.current = newStream;
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = newStream;
+          videoRef.current.play();
+        }
+        
+        // Restart audio analysis with new stream
+        if (audioContextRef.current && microphoneRef.current) {
+          microphoneRef.current.disconnect();
+          microphoneRef.current = audioContextRef.current.createMediaStreamSource(newStream);
+          if (analyserRef.current) {
+            microphoneRef.current.connect(analyserRef.current);
+          }
+        }
+        
+        setIsVideoEnabled(true);
+        toast({
+          title: "Video enabled",
+          description: "Camera has been turned on.",
+        });
+      }
+      
+      // Update participant list to reflect video status
+      setParticipants(prev => prev.map(p => 
+        p.id === userId ? { ...p, hasVideo: !isVideoEnabled } : p
+      ));
+      
+    } catch (error) {
+      console.error('Error toggling video:', error);
+      toast({
+        title: "Video error",
+        description: "Unable to access camera.",
+        variant: "destructive"
       });
     }
-    setIsMuted(!enabled);
-    setParticipants(prev => prev.map(p => p.id === userId ? { ...p, isMuted: !enabled } : p));
-    socketService.sendMuteStatus(roomId, !enabled);
   };
-
-  const handlePTTDown = () => {
-    if (!pushToTalk || pttActive) return;
-    setPttActive(true);
-    setMicEnabled(true);
-  };
-
-  const handlePTTUp = () => {
-    if (!pushToTalk || !pttActive) return;
-    setPttActive(false);
-    setMicEnabled(false);
-  };
-
-  useEffect(() => {
-    if (!pushToTalk) return;
-    // Ensure mic is muted when enabling PTT
-    setMicEnabled(false);
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        handlePTTDown();
-      }
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        handlePTTUp();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      if (pttActive) {
-        setPttActive(false);
-        setMicEnabled(false);
-      }
-    };
-  }, [pushToTalk]);
 
   const leaveRoom = () => {
     cleanup();
     onLeaveRoom();
-    toast({
-      title: t('leaveRoom'),
-      description: t('disconnected'),
-    });
   };
 
-  const cleanup = () => {
-    // Clear speaking timeouts
-    if (speakingTimeoutRef.current) {
-      clearTimeout(speakingTimeoutRef.current);
-    }
-    speakingTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
-    speakingTimeoutsRef.current.clear();
+  // Push-to-talk functionality
+  const handlePTTDown = () => {
+    if (!pushToTalk || !streamRef.current) return;
     
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-    }
+    const audioTracks = streamRef.current.getAudioTracks();
+    audioTracks.forEach(track => {
+      track.enabled = true;
+    });
+    
+    setPttActive(true);
   };
+
+  const handlePTTUp = () => {
+    if (!pushToTalk || !streamRef.current) return;
+    
+    const audioTracks = streamRef.current.getAudioTracks();
+    audioTracks.forEach(track => {
+      track.enabled = false;
+    });
+    
+    setPttActive(false);
+  };
+
+  // Keyboard listener for push-to-talk
+  useEffect(() => {
+    if (!pushToTalk) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Space' && !pttActive) {
+        event.preventDefault();
+        handlePTTDown();
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space' && pttActive) {
+        event.preventDefault();
+        handlePTTUp();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [pushToTalk, pttActive]);
+
+  // Set initial audio track state when push-to-talk is toggled
+  useEffect(() => {
+    if (!streamRef.current) return;
+    
+    const audioTracks = streamRef.current.getAudioTracks();
+    if (pushToTalk) {
+      // In push-to-talk mode, start with audio disabled
+      audioTracks.forEach(track => {
+        track.enabled = false;
+      });
+      setIsMuted(false); // Reset mute state since we're controlling via PTT
+    } else {
+      // In normal mode, audio should be enabled unless manually muted
+      audioTracks.forEach(track => {
+        track.enabled = !isMuted;
+      });
+    }
+  }, [pushToTalk]);
 
   const testMicrophone = async () => {
+    if (isTesting) return;
+    
     setIsTesting(true);
     try {
-      if (!streamRef.current) {
-        await initializeAudio();
-      }
-      
       if (streamRef.current && audioContextRef.current) {
-        // Create audio context for loopback
         const source = audioContextRef.current.createMediaStreamSource(streamRef.current);
         const gainNode = audioContextRef.current.createGain();
         
@@ -511,65 +636,78 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                 {participants.map(participant => (
                   <Card 
                     key={participant.id} 
-                    className={`p-4 transition-all duration-300 border-2 relative overflow-hidden ${
+                    className={`relative overflow-hidden transition-all duration-300 border-2 ${
                       participant.isSpeaking 
                         ? 'border-primary shadow-lg shadow-primary/50 bg-gradient-to-br from-primary/15 to-primary/10' 
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    {/* Speaking glow effect */}
-                    {participant.isSpeaking && (
-                      <div className="absolute inset-0 pointer-events-none">
-                        <div className="absolute inset-0 bg-primary/5 rounded-lg" />
-                        <div className="absolute inset-0 border-2 border-primary/40 rounded-lg" />
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center justify-between relative z-10">
-                      <div className="flex items-center gap-3">
-                        <div className={`relative w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300 ${
-                          participant.isSpeaking 
-                            ? 'bg-primary text-primary-foreground scale-110 shadow-lg shadow-primary/60' 
-                            : 'bg-muted text-muted-foreground hover:scale-105'
-                        }`}>
-                          {participant.name.charAt(0).toUpperCase()}
-                          
-                          {/* Steady glow ring for speaking */}
-                          {participant.isSpeaking && (
-                            <>
-                              <div className="absolute inset-0 rounded-full border-2 border-primary/60" />
-                              <div className="absolute -inset-1 rounded-full border border-primary/40" />
-                              <div className="absolute -inset-2 rounded-full border border-primary/20" />
-                            </>
+                    {/* Video or Avatar Display */}
+                    <div className="relative aspect-video bg-muted rounded-t-lg overflow-hidden">
+                      {participant.hasVideo ? (
+                        <div 
+                          id={`video-container-${participant.id}`} 
+                          className="w-full h-full bg-black"
+                        >
+                          {participant.id === userId && (
+                            <video
+                              ref={videoRef}
+                              autoPlay
+                              muted
+                              playsInline
+                              className="w-full h-full object-cover transform scale-x-[-1]"
+                            />
                           )}
                         </div>
-                        <div>
-                          <p className={`font-medium transition-all duration-300 ${
-                            participant.isSpeaking ? 'text-primary scale-105' : 'text-foreground'
-                          }`}>
-                            {participant.name}
-                          </p>
-                          <p className={`text-xs transition-all duration-300 font-medium ${
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                          <div className={`w-20 h-20 rounded-full flex items-center justify-center font-bold text-2xl transition-all duration-300 ${
                             participant.isSpeaking 
-                              ? 'text-primary' 
-                              : 'text-muted-foreground'
+                              ? 'bg-primary text-primary-foreground scale-110 shadow-lg shadow-primary/60' 
+                              : 'bg-background text-foreground'
                           }`}>
-                            {participant.isSpeaking ? (
-                              <span className="flex items-center gap-1">
-                                🔊 {t('speaking')}
-                                <span className="inline-block w-2 h-2 bg-primary rounded-full" />
-                              </span>
-                            ) : (
-                              (participant.isMuted ? t('muted') : t('participant'))
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      {participant.isMuted && (
-                        <div className="p-2 rounded-full bg-destructive/10 animate-pulse">
-                          <MicOff className="w-4 h-4 text-destructive" />
+                            {participant.name.charAt(0).toUpperCase()}
+                          </div>
                         </div>
                       )}
+                      
+                      {/* Speaking indicator overlay */}
+                      {participant.isSpeaking && (
+                        <div className="absolute inset-0 border-4 border-primary/60 rounded-lg" />
+                      )}
+                      
+                      {/* Muted/Video status indicators */}
+                      <div className="absolute bottom-2 right-2 flex gap-1">
+                        {participant.isMuted && (
+                          <div className="bg-destructive text-destructive-foreground p-1 rounded-full">
+                            <MicOff className="w-3 h-3" />
+                          </div>
+                        )}
+                        {!participant.hasVideo && (
+                          <div className="bg-muted-foreground text-background p-1 rounded-full">
+                            <VideoOff className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Participant Info */}
+                    <div className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <p className={`font-medium transition-all duration-300 ${
+                              participant.isSpeaking ? 'text-primary' : 'text-foreground'
+                            }`}>
+                              {participant.name}
+                              {participant.id === userId && ` (${t('you')})`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {participant.isSpeaking ? t('speaking') : participant.isMuted ? t('muted') : t('participant')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </Card>
                 ))}
@@ -585,66 +723,72 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                     variant="outline"
                     onClick={testMicrophone}
                     disabled={isTesting}
-                    className="flex items-center gap-2 h-12 bg-background/50 hover:bg-primary/10 hover:border-primary/50"
+                    className="h-12 transition-all duration-300 hover:scale-105"
                   >
-                    <Mic className="w-4 h-4" />
-                    {isTesting ? t('audioTesting') : t('testMicrophone')}
+                    <Mic className="w-4 h-4 mr-2" />
+                    {isTesting ? "Testing..." : t('testMicrophone')}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={testSpeakers}
-                    className="flex items-center gap-2 h-12 bg-background/50 hover:bg-primary/10 hover:border-primary/50"
+                    className="h-12 transition-all duration-300 hover:scale-105"
                   >
-                    <Volume2 className="w-4 h-4" />
+                    <Volume2 className="w-4 h-4 mr-2" />
                     {t('testSpeakers')}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  {t('audioTesting')}
-                </p>
               </div>
             </Card>
           </div>
 
-          {/* Right Panel - Controls & Activity */}
+          {/* Right Panel - Controls */}
           <div className="space-y-6">
             {/* Voice Activity */}
-            <Card className="p-6 bg-gradient-to-br from-primary/5 via-card to-accent/5">
+            <Card className="p-6 bg-gradient-to-br from-card via-card to-accent/5">
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-foreground text-center">{t('voiceActivity')}</h3>
-                <div className="space-y-3">
-                  <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+                <h3 className="text-lg font-semibold text-foreground">{t('voiceActivity')}</h3>
+                
+                {/* Volume Meter */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t('volume')}</span>
+                    <span className="font-mono text-primary">{Math.round(volumeLevel)}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-150 rounded-full"
+                      className={`h-full rounded-full transition-all duration-100 ${
+                        volumeLevel > 50 ? 'bg-primary' : volumeLevel > 20 ? 'bg-accent' : 'bg-muted-foreground'
+                      }`}
                       style={{ width: `${volumeLevel}%` }}
                     />
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className={`font-medium transition-colors ${
-                      volumeLevel > 10 && !isMuted ? 'text-primary' : 'text-muted-foreground'
-                    }`}>
-                      {volumeLevel > 10 && !isMuted ? t('speaking') : t('participant')}
-                    </span>
-                    <span className="text-muted-foreground font-mono">
-                      {Math.round(volumeLevel)}%
-                    </span>
+                </div>
+
+                {/* Push to Talk Settings */}
+                <div className="space-y-3 pt-4 border-t border-border/50">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="pushToTalk" className="text-sm font-medium text-foreground">
+                      {t('pushToTalk')}
+                    </label>
+                    <Switch
+                      id="pushToTalk"
+                      checked={pushToTalk}
+                      onCheckedChange={setPushToTalk}
+                    />
                   </div>
+                  {pushToTalk && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('holdSpaceToTalk')}
+                    </p>
+                  )}
                 </div>
               </div>
             </Card>
 
-            {/* Controls */}
+            {/* Main Controls */}
             <Card className="p-6 bg-gradient-to-br from-card via-card to-primary/5">
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-foreground text-center">{t('connectionStatus')}</h3>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{t('pushToTalk')}</p>
-                    <p className="text-sm text-muted-foreground">{t('holdSpaceToTalk')}</p>
-                  </div>
-                  <Switch checked={pushToTalk} onCheckedChange={(v) => setPushToTalk(v)} />
-                </div>
+                <h3 className="text-lg font-semibold text-center text-foreground">Controls</h3>
                 
                 <div className="flex justify-center gap-4">
                   <Button
@@ -656,6 +800,15 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                     className="w-16 h-16 rounded-full transition-all duration-300 hover:scale-105"
                   >
                     {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                  </Button>
+                  
+                  <Button
+                    variant={isVideoEnabled ? "default" : "outline"}
+                    size="lg"
+                    onClick={toggleVideo}
+                    className="w-16 h-16 rounded-full transition-all duration-300 hover:scale-105"
+                  >
+                    {isVideoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
                   </Button>
                   
                   <Button

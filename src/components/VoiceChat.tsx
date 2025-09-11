@@ -384,12 +384,23 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         }
         
         setIsVideoEnabled(false);
+        
+        // Update participant list immediately to reflect video status
+        setParticipants(prev => prev.map(p => 
+          p.id === userId ? { ...p, hasVideo: false } : p
+        ));
+        
         console.log('Video disabled successfully');
         toast({
           title: "Video disabled",
           description: "Camera has been turned off.",
         });
       } else {
+        // Update participant list first to show video container
+        setParticipants(prev => prev.map(p => 
+          p.id === userId ? { ...p, hasVideo: true } : p
+        ));
+        
         // Enable video - get new stream with video
         console.log('Requesting camera access...');
         const constraints = {
@@ -416,11 +427,20 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         
         streamRef.current = newStream;
         
-        if (videoRef.current) {
-          videoRef.current.srcObject = newStream;
-          await videoRef.current.play();
-          console.log('Local video element updated and playing');
-        }
+        // Set video enabled state first
+        setIsVideoEnabled(true);
+        
+        // Wait a bit for React to render the video element
+        setTimeout(() => {
+          if (videoRef.current && streamRef.current) {
+            videoRef.current.srcObject = streamRef.current;
+            videoRef.current.play().then(() => {
+              console.log('Local video element updated and playing');
+            }).catch(error => {
+              console.error('Error playing local video:', error);
+            });
+          }
+        }, 100);
         
         // Restart audio analysis with new stream
         if (audioContextRef.current) {
@@ -435,7 +455,6 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           }
         }
         
-        setIsVideoEnabled(true);
         console.log('Video enabled successfully');
         toast({
           title: "Video enabled",
@@ -443,14 +462,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         });
       }
       
-      // Update participant list to reflect video status (use new state)
-      const newVideoState = !isVideoEnabled;
-      setParticipants(prev => prev.map(p => 
-        p.id === userId ? { ...p, hasVideo: newVideoState } : p
-      ));
-      
     } catch (error) {
       console.error('Error toggling video:', error);
+      // Reset participant video status on error
+      setParticipants(prev => prev.map(p => 
+        p.id === userId ? { ...p, hasVideo: false } : p
+      ));
+      setIsVideoEnabled(false);
       toast({
         title: "Video error",
         description: "Unable to access camera.",

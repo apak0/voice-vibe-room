@@ -193,6 +193,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
 
   const initializeAudio = async () => {
     try {
+      console.log('Initializing audio/video with isVideoEnabled:', isVideoEnabled);
       const constraints = { 
         audio: {
           echoCancellation: true,
@@ -206,7 +207,12 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         } : false
       };
       
+      console.log('Requesting media with constraints:', constraints);
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('Media stream obtained:', {
+        audioTracks: stream.getAudioTracks().length,
+        videoTracks: stream.getVideoTracks().length
+      });
       
       streamRef.current = stream;
       
@@ -362,34 +368,36 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   };
 
   const toggleVideo = async () => {
-    if (!streamRef.current) return;
-    
     try {
       if (isVideoEnabled) {
         // Disable video - remove video tracks
-        const videoTracks = streamRef.current.getVideoTracks();
-        videoTracks.forEach(track => {
-          track.stop();
-          streamRef.current?.removeTrack(track);
-        });
+        if (streamRef.current) {
+          const videoTracks = streamRef.current.getVideoTracks();
+          videoTracks.forEach(track => {
+            track.stop();
+            streamRef.current?.removeTrack(track);
+          });
+        }
         
         if (videoRef.current) {
           videoRef.current.srcObject = null;
         }
         
         setIsVideoEnabled(false);
+        console.log('Video disabled successfully');
         toast({
           title: "Video disabled",
           description: "Camera has been turned off.",
         });
       } else {
         // Enable video - get new stream with video
+        console.log('Requesting camera access...');
         const constraints = {
-          audio: {
+          audio: streamRef.current ? {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true
-          },
+          } : false,
           video: {
             width: { ideal: 1280 },
             height: { ideal: 720 },
@@ -397,23 +405,30 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           }
         };
         
-        // Stop current stream and get new one with video
-        const oldStream = streamRef.current;
+        // Get new stream with video
         const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('Camera access granted, new stream created');
         
-        // Stop old tracks
-        oldStream.getTracks().forEach(track => track.stop());
+        // If we have an existing stream, stop it
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+        }
         
         streamRef.current = newStream;
         
         if (videoRef.current) {
           videoRef.current.srcObject = newStream;
-          videoRef.current.play();
+          await videoRef.current.play();
+          console.log('Local video element updated and playing');
         }
         
         // Restart audio analysis with new stream
-        if (audioContextRef.current && microphoneRef.current) {
-          microphoneRef.current.disconnect();
+        if (audioContextRef.current) {
+          // Disconnect old microphone if exists
+          if (microphoneRef.current) {
+            microphoneRef.current.disconnect();
+          }
+          
           microphoneRef.current = audioContextRef.current.createMediaStreamSource(newStream);
           if (analyserRef.current) {
             microphoneRef.current.connect(analyserRef.current);
@@ -421,15 +436,17 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         }
         
         setIsVideoEnabled(true);
+        console.log('Video enabled successfully');
         toast({
           title: "Video enabled",
           description: "Camera has been turned on.",
         });
       }
       
-      // Update participant list to reflect video status
+      // Update participant list to reflect video status (use new state)
+      const newVideoState = !isVideoEnabled;
       setParticipants(prev => prev.map(p => 
-        p.id === userId ? { ...p, hasVideo: !isVideoEnabled } : p
+        p.id === userId ? { ...p, hasVideo: newVideoState } : p
       ));
       
     } catch (error) {

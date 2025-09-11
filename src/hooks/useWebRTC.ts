@@ -10,6 +10,55 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
   const peersRef = useRef<Map<string, PeerConnection>>(new Map());
   const socketRef = useRef(socketService.connect());
 
+  // Update existing peer connections when local stream changes
+  const updatePeerConnections = useCallback(async (newStream: MediaStream | null) => {
+    console.log('Updating peer connections with new stream:', {
+      peersCount: peersRef.current.size,
+      hasStream: !!newStream,
+      audioTracks: newStream?.getAudioTracks().length || 0,
+      videoTracks: newStream?.getVideoTracks().length || 0
+    });
+
+    for (const [userId, peer] of peersRef.current) {
+      try {
+        // Remove old tracks
+        const senders = peer.connection.getSenders();
+        for (const sender of senders) {
+          if (sender.track) {
+            peer.connection.removeTrack(sender);
+          }
+        }
+
+        // Add new tracks if stream exists
+        if (newStream) {
+          newStream.getTracks().forEach(track => {
+            peer.connection.addTrack(track, newStream);
+          });
+        }
+
+        // Renegotiate the connection
+        const offer = await peer.connection.createOffer();
+        await peer.connection.setLocalDescription(offer);
+
+        socketService.sendSignal(roomId, {
+          type: 'offer',
+          offer,
+        }, userId);
+
+        console.log(`Updated peer connection for user: ${userId}`);
+      } catch (error) {
+        console.error(`Error updating peer connection for user ${userId}:`, error);
+      }
+    }
+  }, [roomId]);
+
+  // Effect to handle stream changes
+  useEffect(() => {
+    if (peersRef.current.size > 0) {
+      updatePeerConnections(localStream);
+    }
+  }, [localStream, updatePeerConnections]);
+
   const createPeerConnection = useCallback((remoteUserId: string): RTCPeerConnection => {
     const configuration = {
       iceServers: [

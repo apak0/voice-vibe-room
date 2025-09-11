@@ -100,10 +100,16 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
   }, [roomId, localStream]);
 
   const playRemoteStream = useCallback((stream: MediaStream, userId: string) => {
-    console.log(`Playing remote stream for user: ${userId}`);
+    console.log(`Playing remote stream for user: ${userId}`, {
+      audioTracks: stream.getAudioTracks().length,
+      videoTracks: stream.getVideoTracks().length
+    });
     
     // Check if stream has video tracks
     const hasVideo = stream.getVideoTracks().length > 0;
+    
+    // Update participant hasVideo status via socket
+    socketService.sendVideoStatus(userId, hasVideo);
     
     if (hasVideo) {
       // Create or update video element for this user
@@ -119,14 +125,21 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
         videoElement.style.width = '100%';
         videoElement.style.height = '100%';
         videoElement.style.objectFit = 'cover';
+        videoElement.style.position = 'absolute';
+        videoElement.style.top = '0';
+        videoElement.style.left = '0';
         videoElement.className = 'rounded-lg';
         
-        // Add to video container instead of body
+        // Add to video container
         const videoContainer = document.getElementById(`video-container-${userId}`);
         if (videoContainer) {
+          // Clear existing content
+          videoContainer.innerHTML = '';
           videoContainer.appendChild(videoElement);
+          console.log(`Created and added video element for user: ${userId}`);
+        } else {
+          console.warn(`Video container not found for user: ${userId}`);
         }
-        console.log(`Created video element for user: ${userId}`);
       }
 
       videoElement.srcObject = stream;

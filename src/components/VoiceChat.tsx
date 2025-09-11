@@ -126,6 +126,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         }
       };
 
+      const handleUserVideoStatus = (data: { userId: string; hasVideo: boolean }) => {
+        console.log("User video status received:", data);
+        setParticipants(prev => prev.map(p => 
+          p.id === data.userId ? { ...p, hasVideo: data.hasVideo } : p
+        ));
+      };
+
       const handleUserLeft = (leftUserId: string) => {
         console.log(`User left event received: ${leftUserId}`);
         setParticipants(prev => prev.filter(p => p.id !== leftUserId));
@@ -179,6 +186,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       socketService.onRoomParticipants(handleRoomParticipants);
       socketService.onUserMuteStatus(handleUserMuteStatus);
       socketService.onUserSpeakingStatus(handleUserSpeakingStatus);
+      socketService.onUserVideoStatus(handleUserVideoStatus);
 
       // Set up presence tracking for Supabase realtime - only call once
       socketService.joinRoom(roomId, userId, userName);
@@ -682,8 +690,9 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                       {participant.hasVideo ? (
                         <div 
                           id={`video-container-${participant.id}`} 
-                          className="w-full h-full bg-black"
+                          className="w-full h-full bg-black relative"
                         >
+                          {/* Local video for current user */}
                           {participant.id === userId && (
                             <video
                               ref={videoRef}
@@ -693,6 +702,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                               className="w-full h-full object-cover transform scale-x-[-1]"
                             />
                           )}
+                          {/* Remote video will be inserted here by WebRTC hook */}
                         </div>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-muted">

@@ -438,6 +438,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         // Set video enabled state - useEffect will handle setting srcObject
         setIsVideoEnabled(true);
         
+        // Also force a re-render of participants to ensure video element is created
+        setTimeout(() => {
+          console.log('Video ref available:', !!videoRef.current);
+          console.log('Stream available:', !!streamRef.current);
+          console.log('Video tracks in stream:', streamRef.current?.getVideoTracks().length);
+        }, 200);
+        
         // Restart audio analysis with new stream
         if (audioContextRef.current) {
           // Disconnect old microphone if exists
@@ -549,14 +556,25 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
 
   // Effect to handle local video display
   useEffect(() => {
-    if (isVideoEnabled && streamRef.current && videoRef.current) {
+    if (isVideoEnabled && streamRef.current) {
       console.log('Setting local video stream');
-      videoRef.current.srcObject = streamRef.current;
-      videoRef.current.play().then(() => {
-        console.log('Local video playing successfully');
-      }).catch(error => {
-        console.error('Error playing local video:', error);
-      });
+      
+      // Use setTimeout to ensure video element is rendered
+      const setVideoStream = () => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          videoRef.current.play().then(() => {
+            console.log('Local video playing successfully');
+          }).catch(error => {
+            console.error('Error playing local video:', error);
+          });
+        } else {
+          console.log('Video ref not ready, retrying...');
+          setTimeout(setVideoStream, 50);
+        }
+      };
+      
+      setTimeout(setVideoStream, 100);
     } else if (!isVideoEnabled && videoRef.current) {
       console.log('Clearing local video stream');
       videoRef.current.srcObject = null;

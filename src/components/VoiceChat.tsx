@@ -435,20 +435,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         
         streamRef.current = newStream;
         
-        // Set video enabled state first
+        // Set video enabled state - useEffect will handle setting srcObject
         setIsVideoEnabled(true);
-        
-        // Wait a bit for React to render the video element
-        setTimeout(() => {
-          if (videoRef.current && streamRef.current) {
-            videoRef.current.srcObject = streamRef.current;
-            videoRef.current.play().then(() => {
-              console.log('Local video element updated and playing');
-            }).catch(error => {
-              console.error('Error playing local video:', error);
-            });
-          }
-        }, 100);
         
         // Restart audio analysis with new stream
         if (audioContextRef.current) {
@@ -558,6 +546,22 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       });
     }
   }, [pushToTalk]);
+
+  // Effect to handle local video display
+  useEffect(() => {
+    if (isVideoEnabled && streamRef.current && videoRef.current) {
+      console.log('Setting local video stream');
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().then(() => {
+        console.log('Local video playing successfully');
+      }).catch(error => {
+        console.error('Error playing local video:', error);
+      });
+    } else if (!isVideoEnabled && videoRef.current) {
+      console.log('Clearing local video stream');
+      videoRef.current.srcObject = null;
+    }
+  }, [isVideoEnabled]);
 
   const testMicrophone = async () => {
     if (isTesting) return;

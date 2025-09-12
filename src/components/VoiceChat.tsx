@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import { socketService } from '@/services/socketService';
+import { VideoManager } from './VideoManager';
 
 interface Participant {
   id: string;
@@ -41,7 +42,6 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const analyserRef = useRef<AnalyserNode | null>(null);
   const microphoneRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
   const testAudioRef = useRef<HTMLAudioElement | null>(null);
   const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const speakingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -224,11 +224,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       
       streamRef.current = stream;
       
-      // Set up local video if enabled
-      if (isVideoEnabled && videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
+      // Set up local video if enabled - VideoManager will handle this
+      console.log('Audio initialized, video will be handled by VideoManager');
       
       // Create audio context for volume analysis
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -376,6 +373,12 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   };
 
   const toggleVideo = async () => {
+    console.log('toggleVideo called, current state:', {
+      isVideoEnabled,
+      hasStream: !!streamRef.current,
+      streamTracks: streamRef.current?.getTracks().length || 0
+    });
+    
     try {
       if (isVideoEnabled) {
         // Disable video - remove video tracks
@@ -387,11 +390,16 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           });
         }
         
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-        
+        // Clear video stream - VideoManager will handle cleanup
         setIsVideoEnabled(false);
+        
+        // Update participant list to reflect video status
+        setParticipants(prev => prev.map(p => 
+          p.id === userId ? { ...p, hasVideo: false } : p
+        ));
+        
+        // Broadcast video status to other participants
+        socketService.sendVideoStatus(userId, false);
         
         // Update participant list immediately to reflect video status
         setParticipants(prev => prev.map(p => 
@@ -435,15 +443,21 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         
         streamRef.current = newStream;
         
-        // Set video enabled state - useEffect will handle setting srcObject
+        // Set video enabled state and let VideoManager handle the rest
         setIsVideoEnabled(true);
         
-        // Also force a re-render of participants to ensure video element is created
-        setTimeout(() => {
-          console.log('Video ref available:', !!videoRef.current);
-          console.log('Stream available:', !!streamRef.current);
-          console.log('Video tracks in stream:', streamRef.current?.getVideoTracks().length);
-        }, 200);
+        // Update participant list to reflect video status
+        setParticipants(prev => prev.map(p => 
+          p.id === userId ? { ...p, hasVideo: true } : p
+        ));
+        
+        // Broadcast video status to other participants
+        socketService.sendVideoStatus(userId, true);
+        
+        console.log('Video enabled successfully with stream:', {
+          audioTracks: newStream.getAudioTracks().length,
+          videoTracks: newStream.getVideoTracks().length
+        });
         
         // Restart audio analysis with new stream
         if (audioContextRef.current) {
@@ -554,32 +568,6 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     }
   }, [pushToTalk]);
 
-  // Effect to handle local video display
-  useEffect(() => {
-    if (isVideoEnabled && streamRef.current) {
-      console.log('Setting local video stream');
-      
-      // Use setTimeout to ensure video element is rendered
-      const setVideoStream = () => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = streamRef.current;
-          videoRef.current.play().then(() => {
-            console.log('Local video playing successfully');
-          }).catch(error => {
-            console.error('Error playing local video:', error);
-          });
-        } else {
-          console.log('Video ref not ready, retrying...');
-          setTimeout(setVideoStream, 50);
-        }
-      };
-      
-      setTimeout(setVideoStream, 100);
-    } else if (!isVideoEnabled && videoRef.current) {
-      console.log('Clearing local video stream');
-      videoRef.current.srcObject = null;
-    }
-  }, [isVideoEnabled]);
 
   const testMicrophone = async () => {
     if (isTesting) return;
@@ -716,12 +704,10 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                         >
                           {/* Local video for current user */}
                           {participant.id === userId && (
-                            <video
-                              ref={videoRef}
-                              autoPlay
-                              muted
-                              playsInline
-                              className="w-full h-full object-cover transform scale-x-[-1]"
+                            <VideoManager
+                              isVideoEnabled={isVideoEnabled}
+                              localStream={streamRef.current}
+                              userId={userId}
                             />
                           )}
                           {/* Remote video will be inserted here by WebRTC hook */}

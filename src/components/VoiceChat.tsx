@@ -381,96 +381,89 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
     
     try {
       if (isVideoEnabled) {
-        // Disable video - remove video tracks
+        // Disable video
+        console.log('Disabling video...');
+        
+        // Stop and remove video tracks
         if (streamRef.current) {
           const videoTracks = streamRef.current.getVideoTracks();
           videoTracks.forEach(track => {
+            console.log('Stopping video track:', track.id);
             track.stop();
             streamRef.current?.removeTrack(track);
           });
         }
         
-        // Clear video stream - VideoManager will handle cleanup
+        // Update states immediately
         setIsVideoEnabled(false);
-        
-        // Update participant list to reflect video status
         setParticipants(prev => prev.map(p => 
           p.id === userId ? { ...p, hasVideo: false } : p
         ));
         
-        // Broadcast video status to other participants
+        // Broadcast status
         socketService.sendVideoStatus(userId, false);
-        
-        // Update participant list immediately to reflect video status
-        setParticipants(prev => prev.map(p => 
-          p.id === userId ? { ...p, hasVideo: false } : p
-        ));
         
         console.log('Video disabled successfully');
         toast({
           title: "Video disabled",
           description: "Camera has been turned off.",
         });
-      } else {
-        // Update participant list first to show video container
-        setParticipants(prev => prev.map(p => 
-          p.id === userId ? { ...p, hasVideo: true } : p
-        ));
         
-        // Enable video - get new stream with video
-        console.log('Requesting camera access...');
-        const constraints = {
-          audio: streamRef.current ? {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          } : false,
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            frameRate: { ideal: 30 }
-          }
+      } else {
+        // Enable video
+        console.log('Enabling video - requesting camera access...');
+        
+        const audioConstraints = streamRef.current ? {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } : false;
+        
+        const videoConstraints = {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
         };
         
         // Get new stream with video
-        const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-        console.log('Camera access granted, new stream created');
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          audio: audioConstraints,
+          video: videoConstraints
+        });
         
-        // If we have an existing stream, stop it
+        console.log('Camera access granted, stream created:', {
+          audioTracks: newStream.getAudioTracks().length,
+          videoTracks: newStream.getVideoTracks().length,
+          streamId: newStream.id
+        });
+        
+        // Stop old stream
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
         }
         
+        // Set new stream
         streamRef.current = newStream;
         
-        // Set video enabled state and let VideoManager handle the rest
+        // Update states after stream is ready
         setIsVideoEnabled(true);
-        
-        // Update participant list to reflect video status
         setParticipants(prev => prev.map(p => 
           p.id === userId ? { ...p, hasVideo: true } : p
         ));
         
-        // Broadcast video status to other participants
-        socketService.sendVideoStatus(userId, true);
-        
-        console.log('Video enabled successfully with stream:', {
-          audioTracks: newStream.getAudioTracks().length,
-          videoTracks: newStream.getVideoTracks().length
-        });
-        
         // Restart audio analysis with new stream
-        if (audioContextRef.current) {
+        if (audioContextRef.current && analyserRef.current) {
           // Disconnect old microphone if exists
           if (microphoneRef.current) {
             microphoneRef.current.disconnect();
           }
           
           microphoneRef.current = audioContextRef.current.createMediaStreamSource(newStream);
-          if (analyserRef.current) {
-            microphoneRef.current.connect(analyserRef.current);
-          }
+          microphoneRef.current.connect(analyserRef.current);
         }
+        
+        // Broadcast status after everything is ready
+        socketService.sendVideoStatus(userId, true);
         
         console.log('Video enabled successfully');
         toast({
@@ -481,11 +474,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       
     } catch (error) {
       console.error('Error toggling video:', error);
-      // Reset participant video status on error
+      
+      // Reset states on error
+      setIsVideoEnabled(false);
       setParticipants(prev => prev.map(p => 
         p.id === userId ? { ...p, hasVideo: false } : p
       ));
-      setIsVideoEnabled(false);
+      
       toast({
         title: "Video error",
         description: "Unable to access camera.",

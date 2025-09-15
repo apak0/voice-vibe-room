@@ -24,31 +24,48 @@ export const VideoManager: React.FC<VideoManagerProps> = ({
     }
 
     if (isVideoEnabled && localStream) {
+      // Check if stream has video tracks
+      const videoTracks = localStream.getVideoTracks();
+      if (videoTracks.length === 0) {
+        console.log('VideoManager: No video tracks in stream, waiting...');
+        return;
+      }
+      
       console.log('VideoManager: Setting up local video stream', {
         streamId: localStream.id,
-        videoTracks: localStream.getVideoTracks().length,
-        audioTracks: localStream.getAudioTracks().length
+        videoTracks: videoTracks.length,
+        audioTracks: localStream.getAudioTracks().length,
+        videoTrackEnabled: videoTracks[0]?.enabled
       });
       
+      // Set the stream
       videoElement.srcObject = localStream;
       
-      videoElement.play()
-        .then(() => {
+      // Play the video
+      const playVideo = async () => {
+        try {
+          await videoElement.play();
           console.log('VideoManager: Local video playing successfully');
-        })
-        .catch(error => {
+        } catch (error) {
           console.error('VideoManager: Error playing local video:', error);
-          // Retry once after a short delay
-          setTimeout(() => {
-            videoElement.play().catch(e => 
-              console.error('VideoManager: Video retry failed:', e)
-            );
-          }, 100);
-        });
+          // Retry after a short delay
+          setTimeout(async () => {
+            try {
+              await videoElement.play();
+              console.log('VideoManager: Video retry successful');
+            } catch (retryError) {
+              console.error('VideoManager: Video retry failed:', retryError);
+            }
+          }, 200);
+        }
+      };
+      
+      playVideo();
     } else {
       console.log('VideoManager: Clearing local video stream', {
         videoEnabled: isVideoEnabled,
-        hasStream: !!localStream
+        hasStream: !!localStream,
+        streamId: localStream?.id
       });
       videoElement.srcObject = null;
     }

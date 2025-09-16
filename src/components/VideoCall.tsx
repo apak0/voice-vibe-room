@@ -76,6 +76,9 @@ export const VideoCall: React.FC<VideoCallProps> = ({
               <Video className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
               <p className="text-lg font-medium">Waiting for others to join...</p>
               <p className="text-sm text-muted-foreground">Share the room ID to start a video call</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Participants: {participants.length}
+              </p>
             </div>
           </Card>
         ) : (

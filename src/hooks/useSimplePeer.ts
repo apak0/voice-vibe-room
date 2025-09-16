@@ -81,12 +81,17 @@ export const useSimplePeer = (roomId: string, userId: string, userName: string, 
 
     if (!peerConnection) {
       // Create peer as non-initiator (answerer)
+      console.log(`Creating answerer peer for ${fromUserName} (${fromUserId})`);
       const peer = createPeer(fromUserId, fromUserName, false);
       peerConnection = peersRef.current.get(fromUserId);
     }
 
     if (peerConnection) {
-      peerConnection.peer.signal(signal);
+      try {
+        peerConnection.peer.signal(signal);
+      } catch (error) {
+        console.error(`Error processing signal from ${fromUserName}:`, error);
+      }
     }
   }, [createPeer]);
 
@@ -119,13 +124,25 @@ export const useSimplePeer = (roomId: string, userId: string, userName: string, 
     console.log('Updating stream for all peers:', {
       peersCount: peersRef.current.size,
       hasNewStream: !!newStream,
+      streamTracks: newStream ? {
+        audio: newStream.getAudioTracks().length,
+        video: newStream.getVideoTracks().length
+      } : null
     });
 
     peersRef.current.forEach((peerConnection) => {
-      if (newStream) {
-        peerConnection.peer.addStream(newStream);
-      } else {
-        peerConnection.peer.removeStream(peerConnection.peer.streams[0]);
+      try {
+        // Remove old stream first
+        if (peerConnection.peer.streams && peerConnection.peer.streams[0]) {
+          peerConnection.peer.removeStream(peerConnection.peer.streams[0]);
+        }
+        
+        // Add new stream
+        if (newStream) {
+          peerConnection.peer.addStream(newStream);
+        }
+      } catch (error) {
+        console.error(`Error updating stream for peer ${peerConnection.userId}:`, error);
       }
     });
   }, []);

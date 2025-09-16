@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useSimplePeer } from '@/hooks/useSimplePeer';
 import { socketService } from '@/services/socketService';
 import { VideoCall } from './VideoCall';
+import { ConnectionDebug } from './ConnectionDebug';
 
 interface Participant {
   id: string;
@@ -88,11 +89,18 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
                 isMuted: false,
                 hasVideo: false
               }];
-              console.log(`Added user to participants:`, newList);
+              console.log(`Added user to participants:`, newList.map(p => ({ id: p.id, name: p.name })));
               return newList;
             }
             return prev;
           });
+          
+          // Send our video status to new participant
+          if (isVideoEnabled && streamRef.current) {
+            setTimeout(() => {
+              socketService.sendVideoStatus(userId, true);
+            }, 1000); // Small delay to ensure they're ready
+          }
         }
       };
 
@@ -145,31 +153,40 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         }
       };
 
-      const handleRoomParticipants = (roomParticipants: { userId: string; userName: string }[]) => {
+      const handleRoomParticipants = (roomParticipants: { userId: string; userName: string; isMuted?: boolean }[]) => {
         console.log('Room participants received:', roomParticipants);
         
-        // Current user should always be included
-        const currentUserParticipant = {
-          id: userId,
-          name: userName,
-          isSpeaking: false,
-          isMuted: false,
-          hasVideo: isVideoEnabled
-        };
-
-        // Other participants
-        const otherParticipants = roomParticipants
-          .filter(p => p.userId !== userId)
-          .map(p => ({
+        // Create participant list with proper state management
+        const allParticipants = roomParticipants.map(p => {
+          const isCurrentUser = p.userId === userId;
+          return {
             id: p.userId,
             name: p.userName,
             isSpeaking: false,
-            isMuted: false,
-            hasVideo: false
-          }));
+            isMuted: isCurrentUser ? isMuted : (p.isMuted || false),
+            hasVideo: isCurrentUser ? (isVideoEnabled && !!streamRef.current?.getVideoTracks().length) : false
+          };
+        });
         
-        const allParticipants = [currentUserParticipant, ...otherParticipants];
-        console.log('Setting all participants:', allParticipants);
+        // Add current user if not in the list
+        const currentUserExists = allParticipants.find(p => p.id === userId);
+        if (!currentUserExists) {
+          allParticipants.push({
+            id: userId,
+            name: userName,
+            isSpeaking: false,
+            isMuted,
+            hasVideo: isVideoEnabled && !!streamRef.current?.getVideoTracks().length
+          });
+        }
+        
+        console.log('Setting all participants:', allParticipants.map(p => ({
+          id: p.id,
+          name: p.name,
+          hasVideo: p.hasVideo,
+          isMuted: p.isMuted
+        })));
+        
         setParticipants(allParticipants);
       };
 
@@ -401,8 +418,10 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       p.id === userId ? { ...p, hasVideo: newVideoState } : p
     ));
     
-    // Broadcast video status
-    socketService.sendVideoStatus(userId, newVideoState);
+    // Broadcast video status when it changes
+    if (streamRef.current) {
+      socketService.sendVideoStatus(userId, newVideoState);
+    }
     
     toast({
       title: newVideoState ? "Video enabled" : "Video disabled",
@@ -609,6 +628,19 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
             )}
           </div>
         </div>
+
+        {/* Debug Info for Development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-6">
+            <ConnectionDebug
+              participants={participants}
+              remoteStreams={remoteStreams}
+              peersCount={peersCount}
+              localStreamActive={!!streamRef.current && 
+                !!(streamRef.current.getAudioTracks().length || streamRef.current.getVideoTracks().length)}
+            />
+          </div>
+        )}
 
         {/* Video Call Interface */}
         <div className="mb-6">

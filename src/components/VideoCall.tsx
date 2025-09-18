@@ -72,9 +72,10 @@ export const VideoCall: React.FC<VideoCallProps> = ({
   return (
     <div className="flex flex-col gap-4 w-full h-full">
       {/* All videos - main area */}
-      <div className="flex-1 grid gap-4 min-h-0">
+      <div className="flex justify-center items-start pt-8">
+        <div className="grid gap-3 max-w-4xl w-full">
         {totalParticipants === 0 ? (
-          <Card className="flex items-center justify-center h-full bg-muted/50">
+          <Card className="flex items-center justify-center h-64 bg-muted/50">
             <div className="text-center">
               <Video className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
               <p className="text-lg font-medium">No video available</p>
@@ -82,7 +83,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({
             </div>
           </Card>
         ) : (
-          <div className={`grid gap-4 h-full ${
+          <div className={`grid gap-3 ${
             totalParticipants === 1 ? 'grid-cols-1' : 
             totalParticipants === 2 ? 'grid-cols-2' : 
             totalParticipants <= 4 ? 'grid-cols-2 grid-rows-2' : 
@@ -90,7 +91,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({
           }`}>
             {/* Local video in main grid */}
             {localStream && (
-              <Card key="local" className="relative overflow-hidden bg-black">
+              <Card key="local" className="relative overflow-hidden bg-black h-48 w-64">
                 {isVideoEnabled ? (
                   <video
                     ref={localVideoRef}
@@ -101,7 +102,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({
                   />
                 ) : (
                   <div className="flex items-center justify-center w-full h-full bg-muted">
-                    <VideoOff className="w-16 h-16 text-muted-foreground" />
+                    <VideoOff className="w-12 h-12 text-muted-foreground" />
                   </div>
                 )}
                 
@@ -132,7 +133,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({
               const hasVideo = streamData.stream.getVideoTracks().length > 0;
               
               return (
-                <Card key={userId} className="relative overflow-hidden bg-black">
+                <Card key={userId} className="relative overflow-hidden bg-black h-48 w-64">
                   {hasVideo ? (
                     <video
                       ref={(el) => {
@@ -144,7 +145,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({
                     />
                   ) : (
                     <div className="flex items-center justify-center w-full h-full bg-muted">
-                      <VideoOff className="w-16 h-16 text-muted-foreground" />
+                      <VideoOff className="w-12 h-12 text-muted-foreground" />
                     </div>
                   )}
                   
@@ -171,6 +172,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({
             })}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

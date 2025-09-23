@@ -650,6 +650,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
             isVideoEnabled={isVideoEnabled}
             isMuted={isMuted}
             participants={participants}
+            currentUserId={userId}
           />
         </div>
 

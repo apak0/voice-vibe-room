@@ -31,7 +31,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [volumeLevel, setVolumeLevel] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -236,17 +236,14 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       console.log('Media stream obtained:', {
         audioTracks: stream.getAudioTracks().length,
-        videoTracks: stream.getVideoTracks().length
+        videoTracks: stream.getVideoTracks().length,
+        videoTrackEnabled: stream.getVideoTracks()[0]?.enabled
       });
       
       streamRef.current = stream;
       
-      // If video is not enabled initially, disable video tracks
-      if (!isVideoEnabled) {
-        stream.getVideoTracks().forEach(track => {
-          track.enabled = false;
-        });
-      }
+      // Video tracks are enabled by default to ensure proper WebRTC connection
+      console.log('Video tracks enabled for WebRTC connection');
       
       // Create audio context for volume analysis
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();

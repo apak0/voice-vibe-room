@@ -15,21 +15,29 @@ export const useSimplePeer = (roomId: string, userId: string, userName: string, 
   const createPeer = useCallback((remoteUserId: string, remoteUserName: string, initiator: boolean) => {
     console.log(`Creating peer connection with ${remoteUserName} (${remoteUserId}), initiator: ${initiator}`);
     
+    if (!localStream) {
+      console.error('Cannot create peer without local stream');
+      return null;
+    }
+
+    console.log('Local stream tracks:', {
+      audio: localStream.getAudioTracks().length,
+      video: localStream.getVideoTracks().length,
+      videoEnabled: localStream.getVideoTracks()[0]?.enabled
+    });
+    
     const peerConfig: SimplePeer.Options = {
       initiator,
       trickle: false,
+      stream: localStream,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
         ],
       },
     };
-
-    // Only add stream if it exists
-    if (localStream) {
-      peerConfig.stream = localStream;
-    }
     
     const peer = new SimplePeer(peerConfig);
 
@@ -78,6 +86,25 @@ export const useSimplePeer = (roomId: string, userId: string, userName: string, 
     return peer;
   }, [roomId, userId, userName, localStream]);
 
+  // Function to recreate peer connections when stream changes
+  const recreatePeerConnections = useCallback(() => {
+    if (!localStream) return;
+    
+    console.log('Recreating peer connections with updated stream');
+    const existingPeers = Array.from(peersRef.current.entries());
+    
+    // Destroy all existing peers
+    existingPeers.forEach(([peerId, peerConnection]) => {
+      peerConnection.peer.destroy();
+    });
+    peersRef.current.clear();
+    
+    // Recreate peers with new stream
+    existingPeers.forEach(([peerId, peerConnection]) => {
+      createPeer(peerId, peerConnection.userName, true);
+    });
+  }, [localStream, createPeer]);
+
   // Handle incoming signals
   const handleSignal = useCallback((data: { signal: any; fromUserId: string; fromUserName: string }) => {
     const { signal, fromUserId, fromUserName } = data;
@@ -105,10 +132,14 @@ export const useSimplePeer = (roomId: string, userId: string, userName: string, 
   const addUser = useCallback((data: { userId: string; userName: string }) => {
     if (data.userId !== userId && !peersRef.current.has(data.userId)) {
       console.log(`User joined: ${data.userName} (${data.userId})`);
+      if (!localStream) {
+        console.log('Waiting for local stream before creating peer...');
+        return;
+      }
       // Create peer as initiator (caller)
       createPeer(data.userId, data.userName, true);
     }
-  }, [userId, createPeer]);
+  }, [userId, createPeer, localStream]);
 
   // Handle user leaving
   const removeUser = useCallback((leftUserId: string) => {

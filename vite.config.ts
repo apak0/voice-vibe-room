@@ -19,6 +19,8 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
       stream: "stream-browserify",
       buffer: "buffer",
+      events: "events",
+      util: "util",
     },
   },
   define: {
@@ -26,6 +28,6 @@ export default defineConfig(({ mode }) => ({
     process: { env: {} },
   },
   optimizeDeps: {
-    include: ['buffer', 'stream-browserify'],
+    include: ['buffer', 'stream-browserify', 'events', 'util'],
   },
 }));

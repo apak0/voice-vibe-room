@@ -15,17 +15,23 @@ export const useSimplePeer = (roomId: string, userId: string, userName: string, 
   const createPeer = useCallback((remoteUserId: string, remoteUserName: string, initiator: boolean) => {
     console.log(`Creating peer connection with ${remoteUserName} (${remoteUserId}), initiator: ${initiator}`);
     
-    const peer = new SimplePeer({
+    const peerConfig: SimplePeer.Options = {
       initiator,
       trickle: false,
-      stream: localStream || undefined,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
         ],
       },
-    });
+    };
+
+    // Only add stream if it exists
+    if (localStream) {
+      peerConfig.stream = localStream;
+    }
+    
+    const peer = new SimplePeer(peerConfig);
 
     // Handle signaling data
     peer.on('signal', (data) => {
@@ -132,14 +138,22 @@ export const useSimplePeer = (roomId: string, userId: string, userName: string, 
 
     peersRef.current.forEach((peerConnection) => {
       try {
-        // Remove old stream first
-        if (peerConnection.peer.streams && peerConnection.peer.streams[0]) {
-          peerConnection.peer.removeStream(peerConnection.peer.streams[0]);
+        const peer = peerConnection.peer;
+        
+        // Remove old tracks
+        if (peer._pc && peer._pc.getSenders) {
+          peer._pc.getSenders().forEach((sender: RTCRtpSender) => {
+            if (sender.track) {
+              peer._pc.removeTrack(sender);
+            }
+          });
         }
         
-        // Add new stream
-        if (newStream) {
-          peerConnection.peer.addStream(newStream);
+        // Add new stream tracks
+        if (newStream && peer._pc) {
+          newStream.getTracks().forEach((track) => {
+            peer._pc.addTrack(track, newStream);
+          });
         }
       } catch (error) {
         console.error(`Error updating stream for peer ${peerConnection.userId}:`, error);

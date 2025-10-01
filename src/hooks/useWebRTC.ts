@@ -10,6 +10,55 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
   const peersRef = useRef<Map<string, PeerConnection>>(new Map());
   const socketRef = useRef(socketService.connect());
 
+  // Update existing peer connections when local stream changes
+  const updatePeerConnections = useCallback(async (newStream: MediaStream | null) => {
+    console.log('Updating peer connections with new stream:', {
+      peersCount: peersRef.current.size,
+      hasStream: !!newStream,
+      audioTracks: newStream?.getAudioTracks().length || 0,
+      videoTracks: newStream?.getVideoTracks().length || 0
+    });
+
+    for (const [userId, peer] of peersRef.current) {
+      try {
+        // Remove old tracks
+        const senders = peer.connection.getSenders();
+        for (const sender of senders) {
+          if (sender.track) {
+            peer.connection.removeTrack(sender);
+          }
+        }
+
+        // Add new tracks if stream exists
+        if (newStream) {
+          newStream.getTracks().forEach(track => {
+            peer.connection.addTrack(track, newStream);
+          });
+        }
+
+        // Renegotiate the connection
+        const offer = await peer.connection.createOffer();
+        await peer.connection.setLocalDescription(offer);
+
+        socketService.sendSignal(roomId, {
+          type: 'offer',
+          offer,
+        }, userId);
+
+        console.log(`Updated peer connection for user: ${userId}`);
+      } catch (error) {
+        console.error(`Error updating peer connection for user ${userId}:`, error);
+      }
+    }
+  }, [roomId]);
+
+  // Effect to handle stream changes
+  useEffect(() => {
+    if (peersRef.current.size > 0) {
+      updatePeerConnections(localStream);
+    }
+  }, [localStream, updatePeerConnections]);
+
   const createPeerConnection = useCallback((remoteUserId: string): RTCPeerConnection => {
     const configuration = {
       iceServers: [
@@ -30,7 +79,7 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
     // Handle incoming remote stream
     peerConnection.ontrack = (event) => {
       const [remoteStream] = event.streams;
-      playRemoteAudio(remoteStream, remoteUserId);
+      playRemoteStream(remoteStream, remoteUserId);
     };
 
     // Handle ICE candidates
@@ -50,46 +99,95 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
     return peerConnection;
   }, [roomId, localStream]);
 
-  const playRemoteAudio = useCallback((stream: MediaStream, userId: string) => {
-    console.log(`Playing remote audio for user: ${userId}`);
+  const playRemoteStream = useCallback((stream: MediaStream, userId: string) => {
+    console.log(`Playing remote stream for user: ${userId}`, {
+      audioTracks: stream.getAudioTracks().length,
+      videoTracks: stream.getVideoTracks().length
+    });
     
-    // Create or update audio element for this user
-    let audioElement = document.getElementById(`audio-${userId}`) as HTMLAudioElement;
+    // Check if stream has video tracks
+    const hasVideo = stream.getVideoTracks().length > 0;
     
-    if (!audioElement) {
-      audioElement = document.createElement('audio');
-      audioElement.id = `audio-${userId}`;
-      audioElement.autoplay = true;
-      audioElement.controls = false;
-      audioElement.style.display = 'none';
-      audioElement.volume = 1.0;
-      audioElement.setAttribute('playsinline', 'true'); // Important for mobile
-      document.body.appendChild(audioElement);
-      console.log(`Created audio element for user: ${userId}`);
-    }
+    // Update participant hasVideo status via socket
+    socketService.sendVideoStatus(userId, hasVideo);
+    
+    if (hasVideo) {
+      // Create or update video element for this user
+      let videoElement = document.getElementById(`video-${userId}`) as HTMLVideoElement;
+      
+      if (!videoElement) {
+        videoElement = document.createElement('video');
+        videoElement.id = `video-${userId}`;
+        videoElement.autoplay = true;
+        videoElement.controls = false;
+        videoElement.muted = false; // Don't mute video element as it contains audio too
+        videoElement.setAttribute('playsinline', 'true');
+        videoElement.style.width = '100%';
+        videoElement.style.height = '100%';
+        videoElement.style.objectFit = 'cover';
+        videoElement.style.position = 'absolute';
+        videoElement.style.top = '0';
+        videoElement.style.left = '0';
+        videoElement.className = 'rounded-lg';
+        
+        // Add to video container
+        const videoContainer = document.getElementById(`video-container-${userId}`);
+        if (videoContainer) {
+          // Clear existing content
+          videoContainer.innerHTML = '';
+          videoContainer.appendChild(videoElement);
+          console.log(`Created and added video element for user: ${userId}`);
+        } else {
+          console.warn(`Video container not found for user: ${userId}`);
+        }
+      }
 
-    audioElement.srcObject = stream;
-    
-    // Attempt to play with better error handling
-    const playPromise = audioElement.play();
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          console.log(`Successfully playing audio for user: ${userId}`);
-          console.log(`Audio element properties:`, {
-            paused: audioElement.paused,
-            muted: audioElement.muted,
-            volume: audioElement.volume,
-            readyState: audioElement.readyState
+      videoElement.srcObject = stream;
+      
+      const playPromise = videoElement.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log(`Successfully playing video for user: ${userId}`);
+          })
+          .catch(error => {
+            console.error(`Error playing video for user ${userId}:`, error);
+            setTimeout(() => {
+              videoElement.play().catch(e => console.error(`Video retry failed for ${userId}:`, e));
+            }, 100);
           });
-        })
-        .catch(error => {
-          console.error(`Error playing audio for user ${userId}:`, error);
-          // Try to play again after a short delay
-          setTimeout(() => {
-            audioElement.play().catch(e => console.error(`Retry failed for ${userId}:`, e));
-          }, 100);
-        });
+      }
+    } else {
+      // Audio only - create audio element
+      let audioElement = document.getElementById(`audio-${userId}`) as HTMLAudioElement;
+      
+      if (!audioElement) {
+        audioElement = document.createElement('audio');
+        audioElement.id = `audio-${userId}`;
+        audioElement.autoplay = true;
+        audioElement.controls = false;
+        audioElement.style.display = 'none';
+        audioElement.volume = 1.0;
+        audioElement.setAttribute('playsinline', 'true');
+        document.body.appendChild(audioElement);
+        console.log(`Created audio element for user: ${userId}`);
+      }
+
+      audioElement.srcObject = stream;
+      
+      const playPromise = audioElement.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log(`Successfully playing audio for user: ${userId}`);
+          })
+          .catch(error => {
+            console.error(`Error playing audio for user ${userId}:`, error);
+            setTimeout(() => {
+              audioElement.play().catch(e => console.error(`Audio retry failed for ${userId}:`, e));
+            }, 100);
+          });
+      }
     }
   }, []);
 
@@ -157,10 +255,14 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
       peer.connection.close();
       peersRef.current.delete(leftUserId);
 
-      // Remove audio element
+      // Remove audio and video elements
       const audioElement = document.getElementById(`audio-${leftUserId}`);
+      const videoElement = document.getElementById(`video-${leftUserId}`);
       if (audioElement) {
         audioElement.remove();
+      }
+      if (videoElement) {
+        videoElement.remove();
       }
     }
   }, []);
@@ -186,8 +288,9 @@ export const useWebRTC = (roomId: string, userId: string, userName: string, loca
       });
       peersRef.current.clear();
 
-      // Remove audio elements
+      // Remove audio and video elements
       document.querySelectorAll('[id^="audio-"]').forEach(el => el.remove());
+      document.querySelectorAll('[id^="video-"]').forEach(el => el.remove());
     };
   }, [localStream, addUser, removeUser, handleSignal]);
 

@@ -17,6 +17,15 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      stream: "stream-browserify",
+      buffer: "buffer",
     },
+  },
+  define: {
+    global: 'globalThis',
+    process: { env: {} },
+  },
+  optimizeDeps: {
+    include: ['buffer', 'stream-browserify'],
   },
 }));

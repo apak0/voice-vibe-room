@@ -66,6 +66,9 @@ class SocketService {
       .on('broadcast', { event: 'user-speaking-status' }, (payload) => {
         this.emit('user-speaking-status', payload.payload);
       })
+      .on('broadcast', { event: 'user-video-status' }, (payload) => {
+        this.emit('user-video-status', payload.payload);
+      })
       .on('presence', { event: 'sync' }, () => {
         console.log('Presence sync event');
         const state = this.channel?.presenceState();
@@ -196,6 +199,16 @@ class SocketService {
     }
   }
 
+  sendVideoStatus(userId: string, hasVideo: boolean) {
+    if (this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'user-video-status',
+        payload: { userId, hasVideo }
+      });
+    }
+  }
+
   onUserJoined(callback: (data: { userId: string; userName: string }) => void) {
     this.on('user-joined', callback);
   }
@@ -218,6 +231,10 @@ class SocketService {
 
   onUserSpeakingStatus(callback: (data: { userId: string; isSpeaking: boolean }) => void) {
     this.on('user-speaking-status', callback);
+  }
+
+  onUserVideoStatus(callback: (data: { userId: string; hasVideo: boolean }) => void) {
+    this.on('user-video-status', callback);
   }
 
   disconnect() {

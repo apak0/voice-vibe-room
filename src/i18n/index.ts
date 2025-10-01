@@ -38,7 +38,13 @@ const resources = {
       "connectionStatus": "Connection Status",
       "connected": "Connected",
       "connecting": "Connecting...",
-      "disconnected": "Disconnected"
+      "disconnected": "Disconnected",
+      "pushToTalk": "Push to Talk",
+      "holdSpaceToTalk": "Hold Space key or press button below to talk",
+      "pushToTalkEnabled": "Push to Talk is enabled - manual mute disabled",
+      "talking": "Talking...",
+      "holdToTalk": "Hold to Talk",
+      "creatingRoom": "Creating Room..."
     }
   },
   tr: {
@@ -75,7 +81,13 @@ const resources = {
       "connectionStatus": "Bağlantı Durumu",
       "connected": "Bağlandı",
       "connecting": "Bağlanıyor...",
-      "disconnected": "Bağlantı kesildi"
+      "disconnected": "Bağlantı kesildi",
+      "pushToTalk": "Basılı Tutarak Konuş",
+      "holdSpaceToTalk": "Konuşmak için Space tuşuna basılı tutun veya aşağıdaki butona basın",
+      "pushToTalkEnabled": "Basılı Tutarak Konuş etkin - manuel susturma devre dışı",
+      "talking": "Konuşuyor...",
+      "holdToTalk": "Konuşmak İçin Basılı Tut",
+      "creatingRoom": "Oda Oluşturuluyor..."
     }
   }
 };

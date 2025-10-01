@@ -36,64 +36,72 @@ class SocketService {
     return { channel: this.channel };
   }
 
-  private setupChannel(roomId: string) {
+  private async setupChannel(roomId: string): Promise<void> {
     if (this.channel) {
-      this.channel.unsubscribe();
+      await this.channel.unsubscribe();
     }
 
-    this.channel = supabase.channel(`room:${roomId}`)
-      .on('broadcast', { event: 'user-joined' }, (payload) => {
-        console.log('Supabase: user-joined received', payload);
-        this.emit('user-joined', payload.payload);
-      })
-      .on('broadcast', { event: 'user-left' }, (payload) => {
-        console.log('Supabase: user-left received', payload);
-        this.emit('user-left', payload.payload.userId);
-      })
-      .on('broadcast', { event: 'signal' }, (payload) => {
-        const data = payload.payload;
-        if (data.targetUserId === this.currentUserId) {
-          this.emit('signal', { signal: data.signal, fromUserId: data.fromUserId });
-        }
-      })
-      .on('broadcast', { event: 'room-participants' }, (payload) => {
-        console.log('Supabase: room-participants received', payload);
-        this.emit('room-participants', payload.payload.participants);
-      })
-      .on('broadcast', { event: 'user-mute-status' }, (payload) => {
-        this.emit('user-mute-status', payload.payload);
-      })
-      .on('broadcast', { event: 'user-speaking-status' }, (payload) => {
-        this.emit('user-speaking-status', payload.payload);
-      })
-      .on('broadcast', { event: 'user-video-status' }, (payload) => {
-        this.emit('user-video-status', payload.payload);
-      })
-      .on('presence', { event: 'sync' }, () => {
-        console.log('Presence sync event');
-        const state = this.channel?.presenceState();
-        console.log('Current presence state:', state);
-        if (state) {
-          const participants = Object.keys(state).map(key => {
-            const presences = state[key] as any[];
-            const presence = presences[0];
-            return {
-              userId: presence.userId,
-              userName: presence.userName,
-              isMuted: presence.isMuted || false
-            };
-          });
-          console.log('Participants from presence:', participants);
-          this.emit('room-participants', participants);
-        }
-      })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        console.log('Presence join event:', key, newPresences);
-      })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        console.log('Presence leave event:', key, leftPresences);
-      })
-      .subscribe();
+    return new Promise((resolve) => {
+      this.channel = supabase.channel(`room:${roomId}`)
+        .on('broadcast', { event: 'user-joined' }, (payload) => {
+          console.log('Supabase: user-joined received', payload);
+          this.emit('user-joined', payload.payload);
+        })
+        .on('broadcast', { event: 'user-left' }, (payload) => {
+          console.log('Supabase: user-left received', payload);
+          this.emit('user-left', payload.payload.userId);
+        })
+        .on('broadcast', { event: 'signal' }, (payload) => {
+          const data = payload.payload;
+          if (data.targetUserId === this.currentUserId) {
+            this.emit('signal', { signal: data.signal, fromUserId: data.fromUserId });
+          }
+        })
+        .on('broadcast', { event: 'room-participants' }, (payload) => {
+          console.log('Supabase: room-participants received', payload);
+          this.emit('room-participants', payload.payload.participants);
+        })
+        .on('broadcast', { event: 'user-mute-status' }, (payload) => {
+          this.emit('user-mute-status', payload.payload);
+        })
+        .on('broadcast', { event: 'user-speaking-status' }, (payload) => {
+          this.emit('user-speaking-status', payload.payload);
+        })
+        .on('broadcast', { event: 'user-video-status' }, (payload) => {
+          this.emit('user-video-status', payload.payload);
+        })
+        .on('presence', { event: 'sync' }, () => {
+          console.log('Presence sync event');
+          const state = this.channel?.presenceState();
+          console.log('Current presence state:', state);
+          if (state) {
+            const participants = Object.keys(state).map(key => {
+              const presences = state[key] as any[];
+              const presence = presences[0];
+              return {
+                userId: presence.userId,
+                userName: presence.userName,
+                isMuted: presence.isMuted || false
+              };
+            });
+            console.log('Participants from presence:', participants);
+            this.emit('room-participants', participants);
+          }
+        })
+        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+          console.log('Presence join event:', key, newPresences);
+        })
+        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+          console.log('Presence leave event:', key, leftPresences);
+        })
+        .subscribe((status) => {
+          console.log('Channel subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('Channel successfully subscribed');
+            resolve();
+          }
+        });
+    });
   }
 
   private emit(eventName: string, data: any) {
@@ -108,14 +116,14 @@ class SocketService {
     this.eventHandlers.get(eventName)!.push(handler);
   }
 
-  joinRoom(roomId: string, userId: string, userName: string) {
+  async joinRoom(roomId: string, userId: string, userName: string) {
     console.log(`Joining room: ${roomId} as ${userName} (${userId})`);
     this.currentRoomId = roomId;
     this.currentUserId = userId;
     this.currentUserName = userName;
 
-    // Setup Supabase channel for real-time communication
-    this.setupChannel(roomId);
+    // Setup Supabase channel for real-time communication and wait for subscription
+    await this.setupChannel(roomId);
     
     // Broadcast user joined
     if (this.channel) {

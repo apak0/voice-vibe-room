@@ -206,7 +206,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
       socketService.onUserVideoStatus(handleUserVideoStatus);
 
       // Set up presence tracking for Supabase realtime - only call once
-      socketService.joinRoom(roomId, userId, userName);
+      await socketService.joinRoom(roomId, userId, userName);
     };
 
     initializeChat();

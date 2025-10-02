@@ -628,19 +628,6 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
           </div>
         </div>
 
-        {/* Debug Info for Development */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mb-6">
-            <ConnectionDebug
-              participants={participants}
-              remoteStreams={remoteStreams}
-              peersCount={peersCount}
-              localStreamActive={!!streamRef.current && 
-                !!(streamRef.current.getAudioTracks().length || streamRef.current.getVideoTracks().length)}
-            />
-          </div>
-        )}
-
         {/* Video Call Interface */}
         <div className="mb-6">
           <VideoCall

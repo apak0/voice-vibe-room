@@ -600,7 +600,9 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ onLeaveRoom, roomId, userN
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-foreground">{t('voiceChat')}</h1>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-[#77a1d3] via-[#79cbca] to-[#e684ae] bg-clip-text text-transparent">
+              VoiceVibe
+            </h1>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">{t('room')}:</span>
               <code className="px-2 py-1 bg-muted rounded text-sm font-mono text-foreground">{roomId}</code>

@@ -53,8 +53,13 @@ class SocketService {
         })
         .on('broadcast', { event: 'signal' }, (payload) => {
           const data = payload.payload;
+          console.log('Signal received:', { fromUserId: data.fromUserId, targetUserId: data.targetUserId, currentUserId: this.currentUserId });
           if (data.targetUserId === this.currentUserId) {
-            this.emit('signal', { signal: data.signal, fromUserId: data.fromUserId });
+            this.emit('signal', { 
+              signal: data.signal, 
+              fromUserId: data.fromUserId,
+              fromUserName: data.fromUserName 
+            });
           }
         })
         .on('broadcast', { event: 'room-participants' }, (payload) => {
@@ -163,15 +168,16 @@ class SocketService {
     this.channel = null;
   }
 
-  sendSignal(roomId: string, signal: any, targetUserId: string) {
+  sendSignal(roomId: string, signalData: any, targetUserId: string) {
     if (this.channel) {
       this.channel.send({
         type: 'broadcast',
         event: 'signal',
         payload: {
           roomId,
-          signal,
-          fromUserId: this.currentUserId,
+          signal: signalData.signal,
+          fromUserId: signalData.fromUserId,
+          fromUserName: signalData.fromUserName,
           targetUserId,
           timestamp: Date.now()
         }
@@ -225,7 +231,7 @@ class SocketService {
     this.on('user-left', callback);
   }
 
-  onSignal(callback: (data: { signal: any; fromUserId: string }) => void) {
+  onSignal(callback: (data: { signal: any; fromUserId: string; fromUserName: string }) => void) {
     this.on('signal', callback);
   }
 

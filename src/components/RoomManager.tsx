@@ -35,7 +35,8 @@ export const RoomManager: React.FC<RoomManagerProps> = ({ onJoinRoom }) => {
     if (!validateInput()) return;
 
     setIsCreating(true);
-    const newRoomId = uuidv4().slice(0, 8).toUpperCase();
+    // Generate a random 4-digit number between 1000-9999
+    const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
 
     setTimeout(() => {
       setIsCreating(false);
@@ -50,19 +51,28 @@ export const RoomManager: React.FC<RoomManagerProps> = ({ onJoinRoom }) => {
   const joinRoom = () => {
     if (!validateInput()) return;
 
-    if (!roomId.trim()) {
+    if (!roomId.trim() || roomId.trim().length !== 4) {
       toast({
         title: "Room ID required",
-        description: "Please enter a room ID to join.",
+        description: "Please enter a 4-digit room ID to join.",
         variant: "destructive",
       });
       return;
     }
 
-    onJoinRoom(roomId.trim().toUpperCase(), userName.trim());
+    if (!/^\d{4}$/.test(roomId.trim())) {
+      toast({
+        title: "Invalid Room ID",
+        description: "Room ID must be 4 digits only.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    onJoinRoom(roomId.trim(), userName.trim());
     toast({
       title: "Joining room...",
-      description: `Connecting to room: ${roomId.trim().toUpperCase()}`,
+      description: `Connecting to room: ${roomId.trim()}`,
     });
   };
 
@@ -151,11 +161,16 @@ export const RoomManager: React.FC<RoomManagerProps> = ({ onJoinRoom }) => {
               <Input
                 id="roomId"
                 type="text"
-                placeholder={t("enterRoomId")}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="0000"
                 value={roomId}
-                onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setRoomId(value);
+                }}
                 className="mt-2"
-                maxLength={10}
+                maxLength={4}
               />
             </div>
             <Button

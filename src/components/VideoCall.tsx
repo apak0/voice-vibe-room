@@ -100,15 +100,12 @@ export const VideoCall: React.FC<VideoCallProps> = ({
             </div>
           </Card>
         ) : (
-          <div className={`grid gap-3 ${
-            totalParticipants === 1 ? 'grid-cols-1' : 
-            totalParticipants === 2 ? 'grid-cols-2' : 
-            totalParticipants <= 4 ? 'grid-cols-2 grid-rows-2' : 
-            'grid-cols-3 grid-rows-2'
+          <div className={`grid gap-3 grid-cols-1 md:grid-cols-2 ${
+            totalParticipants > 4 ? 'lg:grid-cols-3' : ''
           }`}>
             {/* Local video in main grid */}
             {localStream && (
-              <Card key="local" className="relative overflow-hidden bg-black h-48 w-64">
+              <Card key="local" className="relative overflow-hidden bg-black aspect-video w-full">
                 {isVideoEnabled ? (
                   <video
                     ref={localVideoRef}
@@ -150,7 +147,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({
               const hasVideo = streamData ? streamData.stream.getVideoTracks().length > 0 : false;
               
               return (
-                <Card key={participant.id} className="relative overflow-hidden bg-black h-48 w-64">
+                <Card key={participant.id} className="relative overflow-hidden bg-black aspect-video w-full">
                   {hasVideo && streamData ? (
                     <video
                       ref={(el) => {
